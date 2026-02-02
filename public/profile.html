@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>Blockly 迷宮 (AI 組)</title>
+  
+  <script src="https://unpkg.com/blockly/blockly_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/msg/zh-hant.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; height: 100vh; display: flex; background: #f5f5f5; overflow: hidden; }
+    
+    /* 遊戲區 */
+    #game-container { width: 360px; padding: 20px; background: #fff; border-right: 1px solid #ccc; display: flex; flex-direction: column; align-items: center; }
+    canvas { border: 2px solid #333; background: #e6e6e6; margin-bottom: 20px; border-radius: 4px; }
+    
+    /* 積木區 */
+    #blocklyDiv { flex-grow: 1; height: 100%; }
+    
+    /* 聊天室 */
+    #chat-panel { width: 350px; background: #f8f9fa; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
+    #chat-history { flex: 1; padding: 15px; overflow-y: auto; background: #fff; }
+    .message { margin-bottom: 10px; padding: 10px; border-radius: 12px; max-width: 90%; font-size: 14px; word-wrap: break-word; }
+    .ai { background: #e8f0fe; color: #1a73e8; align-self: flex-start; }
+    .user { background: #d1e7dd; color: #0f5132; align-self: flex-end; margin-left: auto; }
+    .chat-input { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px; background: #fff; }
+    
+    /* 登入遮罩 */
+    #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; display: flex; justify-content: center; align-items: center; }
+    .auth-box { background: white; padding: 30px; border-radius: 8px; width: 320px; text-align: center; }
+    .auth-box input { width: 90%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }
+    .auth-box button { width: 100%; padding: 10px; margin-top: 5px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; }
+    
+    #status-bar { width: 100%; margin-top: 10px; padding: 8px; background: #f0f0f0; border-radius: 5px; font-size: 12px; text-align: center; color: #555; }
+    .save-status { font-size: 11px; color: #888; margin-top: 5px; font-weight: bold; }
+
+    /* ★★★ 按鈕樣式優化 ★★★ */
+    .btn-row {
+        display: flex;
+        gap: 10px;
+        width: 100%;
+        margin-top: 10px;
+    }
+    .btn-action {
+        flex: 1; /* 平均分配寬度 */
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 14px;
+        color: white;
+        transition: 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .btn-run { background: #d94d3a; }
+    .btn-run:hover { background: #c93d2a; }
+
+    .btn-reset { background: #999; }
+    .btn-reset:hover { background: #888; }
+
+    .btn-save { background: #4285F4; }
+    .btn-save:hover { background: #3367d6; }
+
+    /* 登出按鈕：白色背景，灰色邊框 */
+    .btn-logout { 
+        background: #fff; 
+        color: #5f6368; 
+        border: 1px solid #dadce0; 
+    }
+    .btn-logout:hover { 
+        background: #f1f3f4; 
+        color: #202124; 
+    }
+  </style>
+</head>
+<body>
+
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <h2>🚀 迷宮 (AI組)</h2>
+      <input type="text" id="username" placeholder="帳號">
+      <input type="password" id="password" placeholder="密碼">
+      <button onclick="auth('login')" style="background:#4285F4">登入</button>
+      <button onclick="auth('register')" style="background:#34a853">註冊</button>
+      <div id="auth-msg" style="margin-top:10px; color:red; font-size:13px;"></div>
+    </div>
+  </div>
+
+  <div id="game-container">
+    <div id="user-info" style="color:#4285F4; margin-bottom:10px; font-size:14px; font-weight:bold;">未登入</div>
+    <h3 style="margin-top:0;">迷宮挑戰</h3>
+    <canvas id="mazeCanvas" width="300" height="300"></canvas>
+    
+    <div class="btn-row">
+      <button onclick="runGame()" class="btn-action btn-run">▶ 執行</button>
+      <button onclick="resetGame()" class="btn-action btn-reset">↺ 重置</button>
+    </div>
+    
+    <div class="btn-row">
+        <button onclick="manualSave()" class="btn-action btn-save">💾 雲端備份</button>
+        <button onclick="logout()" class="btn-action btn-logout">🚪 登出</button>
+    </div>
+
+    <div id="status-bar">
+        <div>📦 紀錄: <span id="buffer-count">0</span> 筆</div>
+        <div id="save-msg" class="save-status">讀取中...</div>
+    </div>
+  </div>
+
+  <div id="blocklyDiv"></div>
+
+  <div id="chat-panel">
+    <div style="padding:15px; border-bottom:1px solid #eee; font-weight:bold; color:#4285F4">🐱 AI 貓導師</div>
+    <div id="chat-history"><div class="message ai">喵嗚！有問題可以問我喔！</div></div>
+    <div class="chat-input">
+      <input type="text" id="userText" style="flex:1; padding:8px; border:1px solid #ddd; border-radius:4px" placeholder="輸入問題...">
+      <button onclick="askAI()" style="background:#4285F4; color:white; border:none; padding:0 15px; border-radius:4px; cursor:pointer">送出</button>
+    </div>
+  </div>
+
+  <xml id="toolbox" style="display:none">
+    <block type="maze_move"></block>
+    <block type="maze_turn"><field name="DIRECTION">LEFT</field></block>
+    <block type="maze_turn"><field name="DIRECTION">RIGHT</field></block>
+    <block type="controls_repeat_ext"><value name="TIMES"><block type="math_number"><field name="NUM">3</field></block></value></block>
+  </xml>
+
+  <script>
+    const API_URL = "http://localhost:3000";
+    let currentUser = localStorage.getItem("username") || "Guest";
+    const STORAGE_KEY = `maze_json_save_${currentUser}`;
+    let token = localStorage.getItem("token");
+
+    // 1. 定義 Blockly
+    Blockly.defineBlocksWithJsonArray([
+      { "type": "maze_move", "message0": "向前移動", "previousStatement": null, "nextStatement": null, "colour": 290 },
+      { "type": "maze_turn", "message0": "向 %1 轉", "args0": [{ "type": "field_dropdown", "name": "DIRECTION", "options": [["左", "LEFT"], ["右", "RIGHT"]] }], "previousStatement": null, "nextStatement": null, "colour": 290 }
+    ]);
+    Blockly.JavaScript.forBlock['maze_move'] = () => "actions.push('move');\n";
+    Blockly.JavaScript.forBlock['maze_turn'] = (b) => `actions.push('${b.getFieldValue('DIRECTION')}');\n`;
+
+    const workspace = Blockly.inject('blocklyDiv', { toolbox: document.getElementById('toolbox') });
+
+    // --- 2. 網頁載入流程 ---
+    window.onload = function() {
+        if (token) {
+            restoreFromLocal();
+            initGame();
+        } else {
+            document.getElementById('save-msg').innerText = "請先登入";
+        }
+    };
+
+    // --- 3. 儲存核心 (JSON Serializer) ---
+    function restoreFromLocal() {
+        const localData = localStorage.getItem(STORAGE_KEY);
+        if (localData) {
+            try {
+                const state = JSON.parse(localData);
+                Blockly.serialization.workspaces.load(state, workspace);
+                console.log("⚡ [Local] 瞬間還原成功");
+                document.getElementById('save-msg').innerText = "已載入暫存";
+            } catch(e) { console.error("Local Restore Error:", e); }
+        }
+    }
+
+    function saveToLocal() {
+        const state = Blockly.serialization.workspaces.save(workspace);
+        const jsonStr = JSON.stringify(state);
+        localStorage.setItem(STORAGE_KEY, jsonStr);
+        return jsonStr;
+    }
+
+    let saveTimeout;
+    function autoSaveToCloud() {
+        const saveMsg = document.getElementById('save-msg');
+        saveMsg.innerText = "備份中..."; 
+        saveMsg.style.color = "#d93025";
+        
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+            if (!token) return;
+            const jsonStr = saveToLocal();
+            try {
+                await fetch(`${API_URL}/api/save-progress`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ xml: jsonStr })
+                });
+                saveMsg.innerText = "☁️ 雲端已同步";
+                saveMsg.style.color = "green";
+            } catch(e) { console.error("Cloud Save Failed"); }
+        }, 1000); 
+    }
+
+    // --- 4. 監聽器 ---
+    workspace.addChangeListener(e => { 
+        if (e.type === Blockly.Events.UI) return; 
+        saveToLocal();
+        autoSaveToCloud();
+
+        if (e.type === Blockly.Events.CHANGE) {
+            logAction('BLOCK_CHANGE', { blockId: e.blockId, name: e.name, oldValue: e.oldValue, newValue: e.newValue });
+        } else if (e.type === Blockly.Events.CREATE) {
+            logAction('BLOCK_CREATE', { type: e.json ? e.json.type : 'unknown' });
+        } else if (e.type === Blockly.Events.DELETE) {
+            logAction('BLOCK_DELETE', { blockId: e.blockId });
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        saveToLocal();
+    });
+
+    // --- 5. 初始化與身分 ---
+    async function initGame() {
+        try {
+            const res = await fetch(`${API_URL}/api/user-data`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+
+                // ★★★ 核心修改：如果是管理員，直接跳轉到後台，不讓他玩遊戲 ★★★
+                if (data.role === 'admin') {
+                    // alert("歡迎管理員，即將進入後台..."); // 想提示再打開
+                    window.location.href = "admin.html";
+                    return; // 終止後續程式碼，直接離開
+                }
+
+                // --- 以下是原本的學生邏輯 (保持不變) ---
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('user-info').innerText = `👤 ${data.username} (AI組)`;
+                
+                localStorage.setItem("username", data.username);
+                currentUser = data.username;
+
+                // 如果是一般組誤入，踢去一般組頁面
+                if (data.group === 'Control') {
+                    window.location.href = 'profile_control.html';
+                    return;
+                }
+
+                const localData = localStorage.getItem(STORAGE_KEY);
+                if (!localData && data.lastXml) {
+                    try {
+                        const state = JSON.parse(data.lastXml);
+                        Blockly.serialization.workspaces.load(state, workspace);
+                        saveToLocal();
+                    } catch(e) {}
+                }
+            } else {
+                localStorage.removeItem('token');
+                location.reload();
+            }
+        } catch(e) { console.error("Init Error", e); }
+    }
+    // --- 6. 登出功能 ---
+    function logout() {
+        if(confirm("確定要登出嗎？")) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+    }
+
+    // --- 其他功能 (AI/Login/Log/Game) ---
+    async function auth(type) {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      try {
+        const res = await fetch(`${API_URL}/${type}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            if (type === 'login') {
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', u);
+                location.reload(); 
+            } else {
+                document.getElementById('auth-msg').innerText = "註冊成功！請登入...";
+            }
+        } else { document.getElementById('auth-msg').innerText = data.error; }
+      } catch(e) { document.getElementById('auth-msg').innerText = "連線失敗"; }
+    }
+
+    let history = []; 
+    async function askAI() {
+      const text = document.getElementById('userText').value;
+      if(!text) return;
+      const chatBox = document.getElementById('chat-history');
+      chatBox.innerHTML += `<div class="message user">${text}</div>`;
+      document.getElementById('userText').value = '';
+      logAction('CHAT_USER', { message: text });
+      
+      const code = Blockly.JavaScript.workspaceToCode(workspace);
+      const gameState = { map: map, player: player, currentCode: code };
+      history.push({role:'user', parts:[{text}]});
+
+      try {
+        const res = await fetch(`${API_URL}/api/ask-ai`, {
+          method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${token}` },
+          body: JSON.stringify({ userText: text, history, gameState })
+        });
+        const data = await res.json();
+        const reply = data.reply || "Error";
+        logAction('CHAT_AI', { message: reply });
+        chatBox.innerHTML += `<div class="message ai">${marked.parse(reply)}</div>`;
+        history.push({role:'ai', parts:[{text: reply}]});
+      } catch(e) {}
+    }
+    document.getElementById('userText').addEventListener('keypress', (e) => { if(e.key === 'Enter') askAI(); });
+
+    let logsBuffer = []; 
+    const bufferDisplay = document.getElementById('buffer-count');
+    function logAction(cat, det) { 
+        if(token) {
+            logsBuffer.push({timestamp:new Date(), category:cat, details:det});
+            bufferDisplay.innerText = logsBuffer.length;
+            if (cat.startsWith('CHAT')) upload();
+        }
+    }
+    async function upload() {
+        if (!token || logsBuffer.length === 0) return;
+        const temp = [...logsBuffer]; logsBuffer=[]; bufferDisplay.innerText=0;
+        await fetch(`${API_URL}/api/logs`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({logs:temp, level:1})});
+    }
+
+    const map = [[1,1,1,1,1,1],[1,2,0,0,1,1],[1,1,1,0,1,1],[1,0,0,0,3,1],[1,1,1,1,1,1]];
+    const startPos = {x:1, y:1, dir:1}; 
+    let player = {...startPos}, isRunning = false, actions = [];
+    const ctx = document.getElementById('mazeCanvas').getContext('2d');
+    const TILE = 50;
+
+    function draw() {
+      ctx.clearRect(0,0,300,300);
+      for(let y=0; y<map.length; y++) for(let x=0; x<map[y].length; x++) {
+        ctx.fillStyle = map[y][x]===1?'#555':(map[y][x]===3?'gold':'#fff');
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE); ctx.strokeRect(x*TILE, y*TILE, TILE, TILE);
+      }
+      ctx.save(); ctx.translate(player.x*TILE+25, player.y*TILE+25); ctx.rotate((player.dir-1)*90 * Math.PI/180); 
+      ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-10,10); ctx.lineTo(-10,-10); ctx.fillStyle='red'; ctx.fill(); ctx.restore();
+    }
+    
+    function resetGame() { player = {...startPos}; draw(); }
+    
+    async function runGame() {
+      if(isRunning) return;
+      if(!token) { alert("請先登入！"); return; }
+      
+      saveToLocal();
+      manualSave();
+
+      const code = Blockly.JavaScript.workspaceToCode(workspace);
+      const state = Blockly.serialization.workspaces.save(workspace);
+      logAction('RUN_CODE', { code: code, state: state });
+      upload();
+      
+      resetGame(); actions = [];
+      try { eval(code); } catch(e){}
+      if(actions.length > 0) {
+        isRunning = true;
+        let i = 0;
+        let t = setInterval(() => {
+          if(i >= actions.length) { clearInterval(t); isRunning=false; return; }
+          let act = actions[i++];
+          if(act==='move') {
+            let nx=player.x, ny=player.y;
+            if(player.dir===0) ny--; if(player.dir===1) nx++; if(player.dir===2) ny++; if(player.dir===3) nx--;
+            if(map[ny] && map[ny][nx]!==1) { player.x=nx; player.y=ny; }
+          } else if(act==='LEFT') player.dir=(player.dir+3)%4;
+          else if(act==='RIGHT') player.dir=(player.dir+1)%4;
+          draw();
+        }, 300);
+      }
+    }
+    draw();
+  </script>
+</body>
+</html>

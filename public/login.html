@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>迷宮學園 - 登入</title>
+  <style>
+    /* 簡單美觀的置中登入框 */
+    body { font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
+    .auth-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+    h2 { margin-bottom: 20px; color: #333; }
+    input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; }
+    button { width: 100%; padding: 12px; margin-top: 10px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; color: white; transition: 0.2s; }
+    .btn-login { background-color: #4285F4; }
+    .btn-login:hover { background-color: #357ae8; }
+    .btn-register { background-color: #34a853; }
+    .btn-register:hover { background-color: #2c8e46; }
+    #msg { margin-top: 15px; font-size: 14px; min-height: 20px; }
+    .error { color: #d93025; }
+    .success { color: #188038; }
+  </style>
+</head>
+<body>
+
+  <div class="auth-box">
+    <h2>🚀 迷宮學園</h2>
+    <input type="text" id="username" placeholder="請輸入帳號">
+    <input type="password" id="password" placeholder="請輸入密碼">
+    
+    <button class="btn-login" onclick="handleAuth('login')">登入</button>
+    <button class="btn-register" onclick="handleAuth('register')">註冊新帳號</button>
+    
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const API_URL = "http://localhost:3000";
+
+    // 處理登入或註冊請求
+    async function handleAuth(type) {
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      const msgDiv = document.getElementById('msg');
+
+      if (!u || !p) {
+        msgDiv.innerHTML = "<span class='error'>請輸入帳號與密碼</span>";
+        return;
+      }
+
+      msgDiv.innerHTML = "處理中...";
+
+      try {
+        const res = await fetch(`${API_URL}/${type}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            if (type === 'login') {
+                // --- 登入成功：開始分流 ---
+                msgDiv.innerHTML = "<span class='success'>登入成功！正在跳轉...</span>";
+                
+                // 1. 儲存資訊到瀏覽器
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('username', data.username);
+                localStorage.setItem('group', data.group);
+
+                // 2. ★★★ 關鍵分流邏輯 ★★★
+                if (data.group === 'Control') {
+                    // 如果是控制組 -> 去沒有 AI 的頁面
+                    window.location.href = 'profile_control.html';
+                } else {
+                    // 如果是 AI 組 (或其他) -> 去有 AI 的頁面
+                    window.location.href = 'profile.html';
+                }
+
+            } else {
+                // --- 註冊成功 ---
+                msgDiv.innerHTML = `<span class='success'>${data.message}<br>請點擊登入按鈕</span>`;
+            }
+        } else {
+            // --- 失敗 ---
+            msgDiv.innerHTML = `<span class='error'>${data.error}</span>`;
+        }
+      } catch (e) {
+        msgDiv.innerHTML = "<span class='error'>伺服器連線失敗</span>";
+        console.error(e);
+      }
+    }
+  </script>
+</body>
+</html>

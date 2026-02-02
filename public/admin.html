@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>迷宮學園 - 管理者後台</title>
+  
+  <script src="https://unpkg.com/blockly/blockly_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/msg/zh-hant.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+    
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    h2 { margin-top: 0; color: #1a73e8; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+    
+    .stats-row { display: flex; gap: 20px; margin-bottom: 20px; }
+    .stat-card { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e0e0e0; }
+    .stat-num { font-size: 24px; font-weight: bold; color: #333; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; color: #555; font-weight: 600; }
+    tr:hover { background-color: #f1f3f4; }
+    
+    .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .online { background-color: #34a853; box-shadow: 0 0 5px #34a853; }
+    .offline { background-color: #ccc; }
+    
+    .badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+    .badge-ai { background: #e8f0fe; color: #1a73e8; }
+    .badge-control { background: #fce8e6; color: #c5221f; }
+    
+    .btn-view { background: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .btn-view:hover { background: #1557b0; }
+
+    /* Modal 樣式 */
+    #modal-overlay { 
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+        background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; 
+    }
+    .modal-box { 
+        background: white; width: 95%; height: 90%; border-radius: 8px; 
+        display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 5px 25px rgba(0,0,0,0.3); 
+    }
+    .modal-header { 
+        padding: 10px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; 
+    }
+    .modal-body { display: flex; flex: 1; overflow: hidden; }
+    
+    .preview-game { width: 360px; padding: 20px; background: #fff; border-right: 1px solid #ccc; display: flex; flex-direction: column; align-items: center; }
+    canvas { border: 2px solid #333; background: #e6e6e6; border-radius: 4px; }
+    .preview-blockly { flex: 1; height: 100%; position: relative; }
+    
+    .modal-close { cursor: pointer; font-size: 24px; color: #666; font-weight: bold; }
+    .modal-close:hover { color: #d93025; }
+    
+    .sync-badge { background: #34a853; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px; display: none;}
+    .syncing .sync-badge { display: inline-block; animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>
+        <span>🛠️ 學生帳號監控台</span>
+        <button onclick="fetchUsers()" class="btn-view" style="font-size:14px">🔄 重新整理列表</button>
+    </h2>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="stat-num" id="total-users">0</div><div>總人數</div></div>
+        <div class="stat-card"><div class="stat-num" id="online-users" style="color:#34a853">0</div><div>目前線上</div></div>
+        <div class="stat-card"><div class="stat-num" id="ai-count">0</div><div>AI 組人數</div></div>
+    </div>
+
+    <table>
+      <thead><tr><th>狀態</th><th>帳號</th><th>組別</th><th>最後活動</th><th>進度</th><th>操作</th></tr></thead>
+      <tbody id="user-table"><tr><td colspan="6" style="text-align:center">載入中...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div id="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header" id="modal-header-div">
+            <div style="display:flex; align-items:center;">
+                <span id="modal-title" style="font-weight:bold; font-size:18px;">學生畫面</span>
+                <span class="sync-badge">🔴 同步監控中</span>
+            </div>
+            <span class="modal-close" onclick="closeModal()">×</span>
+        </div>
+        <div class="modal-body">
+            <div class="preview-game">
+                <h3 style="margin-top:0; color:#555;">即時預覽</h3>
+                <canvas id="previewCanvas" width="300" height="300"></canvas>
+                <div style="margin-top:10px; color:#666; font-size:13px; text-align:center;">
+                    系統會每 1.5 秒同步一次學生積木<br>並模擬執行路徑
+                </div>
+            </div>
+            <div id="modal-blockly" class="preview-blockly"></div>
+        </div>
+    </div>
+  </div>
+
+  <xml id="toolbox" style="display:none"></xml> 
+
+  <script>
+    const API_URL = "http://localhost:3000";
+    const token = localStorage.getItem("token");
+    let viewerWorkspace = null; 
+    let currentViewingUser = null; // ★★★ 紀錄目前正在監看的學生 ★★★
+    let lastLoadedXml = ""; // 避免重複渲染
+    
+    // 遊戲參數
+    const map = [[1,1,1,1,1,1],[1,2,0,0,1,1],[1,1,1,0,1,1],[1,0,0,0,3,1],[1,1,1,1,1,1]];
+    const startPos = {x:1, y:1, dir:1}; 
+    let previewPlayer = {...startPos};
+    const ctx = document.getElementById('previewCanvas').getContext('2d');
+    const TILE = 50;
+
+    // 1. 初始化 Blockly
+    function initViewer() {
+        if (!viewerWorkspace) {
+            Blockly.defineBlocksWithJsonArray([
+              { "type": "maze_move", "message0": "向前移動", "previousStatement": null, "nextStatement": null, "colour": 290 },
+              { "type": "maze_turn", "message0": "向 %1 轉", "args0": [{ "type": "field_dropdown", "name": "DIRECTION", "options": [["左", "LEFT"], ["右", "RIGHT"]] }], "previousStatement": null, "nextStatement": null, "colour": 290 }
+            ]);
+            Blockly.JavaScript.forBlock['maze_move'] = () => "actions.push('move');\n";
+            Blockly.JavaScript.forBlock['maze_turn'] = (b) => `actions.push('${b.getFieldValue('DIRECTION')}');\n`;
+            
+            viewerWorkspace = Blockly.inject('modal-blockly', {
+                readOnly: true, scrollbars: true,
+                zoom: { controls: true, wheel: true, startScale: 0.8 },
+                toolbox: document.getElementById('toolbox')
+            });
+        }
+    }
+
+    // 2. 繪製遊戲 (含軌跡)
+    function drawPreview(trace) {
+      ctx.clearRect(0,0,300,300);
+      
+      // 地圖
+      for(let y=0; y<map.length; y++) for(let x=0; x<map[y].length; x++) {
+        ctx.fillStyle = map[y][x]===1?'#555':(map[y][x]===3?'gold':'#fff');
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE); ctx.strokeRect(x*TILE, y*TILE, TILE, TILE);
+      }
+
+      // 畫軌跡 (紅色線)
+      if (trace && trace.length > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.lineWidth = 5;
+        ctx.moveTo(startPos.x*TILE+25, startPos.y*TILE+25);
+        for(let p of trace) {
+            ctx.lineTo(p.x*TILE+25, p.y*TILE+25);
+        }
+        ctx.stroke();
+      }
+
+      // 畫玩家
+      ctx.save(); 
+      ctx.translate(previewPlayer.x*TILE+25, previewPlayer.y*TILE+25); 
+      ctx.rotate((previewPlayer.dir-1)*90 * Math.PI/180); 
+      ctx.beginPath(); ctx.moveTo(10,0); ctx.lineTo(-10,10); ctx.lineTo(-10,-10); 
+      ctx.fillStyle='red'; ctx.fill(); 
+      ctx.restore();
+    }
+
+    // 3. 模擬執行程式碼
+    function simulateRun() {
+        previewPlayer = {...startPos};
+        let actions = [];
+        let trace = []; // 紀錄走過的路徑
+
+        try {
+            const code = Blockly.JavaScript.workspaceToCode(viewerWorkspace);
+            eval(code); 
+            
+            for(let act of actions) {
+                if(act==='move') {
+                    let nx=previewPlayer.x, ny=previewPlayer.y;
+                    if(previewPlayer.dir===0) ny--; if(previewPlayer.dir===1) nx++; 
+                    if(previewPlayer.dir===2) ny++; if(previewPlayer.dir===3) nx--;
+                    if(map[ny] && map[ny][nx]!==1) { 
+                        previewPlayer.x=nx; previewPlayer.y=ny; 
+                        trace.push({x:nx, y:ny}); // 紀錄軌跡
+                    }
+                } else if(act==='LEFT') {
+                    previewPlayer.dir=(previewPlayer.dir+3)%4;
+                } else if(act==='RIGHT') {
+                    previewPlayer.dir=(previewPlayer.dir+1)%4;
+                }
+            }
+        } catch(e) {}
+        
+        drawPreview(trace);
+    }
+
+    // 4. 打開監控視窗
+    function viewUser(username, encodedXml) {
+        currentViewingUser = username; // ★★★ 鎖定使用者 ★★★
+        lastLoadedXml = ""; // 重置狀態
+        document.getElementById('modal-overlay').style.display = 'flex';
+        document.getElementById('modal-header-div').classList.add('syncing');
+        document.getElementById('modal-title').innerText = `正在監控：${username}`;
+        
+        // 第一次載入 (如果有資料)
+        setTimeout(() => {
+            initViewer();
+            viewerWorkspace.clear();
+            if(encodedXml) updateWorkspace(decodeURIComponent(encodedXml));
+        }, 100);
+    }
+
+    // 更新 Blockly 畫面 (只有當資料變更時才重繪)
+    function updateWorkspace(xmlString) {
+        if (!xmlString || xmlString === lastLoadedXml) return; // 沒變就不動
+        lastLoadedXml = xmlString;
+
+        try {
+            viewerWorkspace.clear();
+            if (xmlString.trim().startsWith('{')) {
+                const state = JSON.parse(xmlString);
+                Blockly.serialization.workspaces.load(state, viewerWorkspace);
+            } else {
+                const xmlDom = Blockly.Xml.textToDom(xmlString);
+                Blockly.Xml.domToWorkspace(xmlDom, viewerWorkspace);
+            }
+            // viewerWorkspace.zoomToFit(); // 讓管理員自己縮放，不要一直重置視角
+            simulateRun(); // 更新左側預覽
+        } catch (e) { console.error("同步失敗", e); }
+    }
+
+    function closeModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+        currentViewingUser = null; // ★★★ 停止監控 ★★★
+        document.getElementById('modal-header-div').classList.remove('syncing');
+    }
+
+    // 5. 核心：自動輪詢與同步
+    async function fetchUsers() {
+        try {
+            const res = await fetch(`${API_URL}/api/admin/users`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) { if(res.status===401) window.location.href="profile.html"; return; }
+            
+            const users = await res.json();
+            
+            // A. 更新列表
+            renderTable(users);
+            updateStats(users);
+
+            // B. ★★★ 如果彈窗打開中，自動更新該學生的積木 ★★★
+            if (currentViewingUser) {
+                const targetUser = users.find(u => u.username === currentViewingUser);
+                if (targetUser && targetUser.lastXml) {
+                    updateWorkspace(targetUser.lastXml);
+                }
+            }
+
+        } catch (e) {}
+    }
+
+    function renderTable(users) {
+        const tbody = document.getElementById('user-table');
+        tbody.innerHTML = '';
+        const now = new Date();
+
+        users.forEach(user => {
+            const lastActive = new Date(user.lastActive);
+            const isOnline = (now - lastActive)/1000/60 < 2; 
+            const statusClass = isOnline ? 'online' : 'offline';
+            const badgeClass = user.group === 'AI' ? 'badge-ai' : 'badge-control';
+            
+            let safeXml = "";
+            if (user.lastXml) safeXml = encodeURIComponent(user.lastXml);
+
+            const row = `
+                <tr>
+                    <td><span class="status-dot ${statusClass}"></span> ${isOnline?'線上':'離線'}</td>
+                    <td><strong>${user.username}</strong> ${user.role==='admin'?'(Admin)':''}</td>
+                    <td><span class="badge ${badgeClass}">${user.group === 'AI' ? 'AI' : '一般'}</span></td>
+                    <td style="color:#666;font-size:13px">${lastActive.toLocaleTimeString()}</td>
+                    <td>${user.lastXml ? user.lastXml.length : 0} 字元</td>
+                    <td>
+                        <button onclick="viewUser('${user.username}', '${safeXml}')" class="btn-view">👀 監控</button>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+    }
+
+    function updateStats(users) {
+        document.getElementById('total-users').innerText = users.length;
+        const now = new Date();
+        document.getElementById('online-users').innerText = users.filter(u => (now - new Date(u.lastActive))/1000/60 < 2).length;
+        document.getElementById('ai-count').innerText = users.filter(u => u.group === 'AI').length;
+    }
+
+    // 啟動 (每 1.5 秒更新一次)
+    if(token) {
+        fetchUsers();
+        setInterval(fetchUsers, 1500); 
+    } else {
+        alert("請先登入"); window.location.href="profile.html";
+    }
+  </script>
+
+</body>
+</html>
