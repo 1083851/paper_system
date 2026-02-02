@@ -20,7 +20,7 @@
     /* 積木區 */
     #blocklyDiv { flex-grow: 1; height: 100%; }
     
-    /* 聊天室 */
+    /* 聊天室 (AI組專屬) */
     #chat-panel { width: 350px; background: #f8f9fa; border-left: 1px solid #ccc; display: flex; flex-direction: column; }
     #chat-history { flex: 1; padding: 15px; overflow-y: auto; background: #fff; }
     .message { margin-bottom: 10px; padding: 10px; border-radius: 12px; max-width: 90%; font-size: 14px; word-wrap: break-word; }
@@ -37,45 +37,47 @@
     #status-bar { width: 100%; margin-top: 10px; padding: 8px; background: #f0f0f0; border-radius: 5px; font-size: 12px; text-align: center; color: #555; }
     .save-status { font-size: 11px; color: #888; margin-top: 5px; font-weight: bold; }
 
-    /* ★★★ 按鈕樣式優化 ★★★ */
+    /* 按鈕排版優化 */
     .btn-row {
         display: flex;
         gap: 10px;
         width: 100%;
-        margin-top: 10px;
+        margin-bottom: 8px;
     }
-    .btn-action {
-        flex: 1; /* 平均分配寬度 */
-        padding: 10px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 14px;
-        color: white;
-        transition: 0.2s;
+
+    .btn-action { 
+        flex: 1;
+        padding: 10px; 
+        border: none; 
+        border-radius: 4px; 
+        cursor: pointer; 
+        font-weight: bold; 
+        color: white; 
+        transition: 0.2s; 
+        font-size: 13px;
         display: flex;
-        align-items: center;
         justify-content: center;
+        align-items: center;
     }
-    .btn-run { background: #d94d3a; }
+
+    .btn-run { background: #d94d3a; } 
     .btn-run:hover { background: #c93d2a; }
 
-    .btn-reset { background: #999; }
+    .btn-reset { background: #999; } 
     .btn-reset:hover { background: #888; }
 
-    .btn-save { background: #4285F4; }
+    .btn-save { background: #4285F4; } 
     .btn-save:hover { background: #3367d6; }
 
-    /* 登出按鈕：白色背景，灰色邊框 */
+    /* 登出按鈕 */
     .btn-logout { 
         background: #fff; 
-        color: #5f6368; 
-        border: 1px solid #dadce0; 
-    }
+        color: #555; 
+        border: 1px solid #ccc; 
+    } 
     .btn-logout:hover { 
-        background: #f1f3f4; 
-        color: #202124; 
+        background: #f0f0f0; 
+        color: #333; 
     }
   </style>
 </head>
@@ -98,12 +100,12 @@
     <canvas id="mazeCanvas" width="300" height="300"></canvas>
     
     <div class="btn-row">
-      <button onclick="runGame()" class="btn-action btn-run">▶ 執行</button>
+      <button onclick="runGame()" class="btn-action btn-run">▶ 執行並存檔</button>
       <button onclick="resetGame()" class="btn-action btn-reset">↺ 重置</button>
     </div>
     
     <div class="btn-row">
-        <button onclick="manualSave()" class="btn-action btn-save">💾 雲端備份</button>
+        <button onclick="manualSave()" class="btn-action btn-save">💾 強制備份</button>
         <button onclick="logout()" class="btn-action btn-logout">🚪 登出</button>
     </div>
 
@@ -177,6 +179,27 @@
         return jsonStr;
     }
 
+    // ★★★ 修正點：補回原本遺失的 manualSave 函式 ★★★
+    async function manualSave() {
+        if (!token) return;
+        const jsonStr = saveToLocal(); // 先存本地
+        const saveMsg = document.getElementById('save-msg');
+        saveMsg.innerText = "⏳ 上傳中...";
+        try {
+            await fetch(`${API_URL}/api/save-progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ xml: jsonStr })
+            });
+            saveMsg.innerText = "✅ 雙重備份完成";
+            saveMsg.style.color = "green";
+            // alert("已儲存！"); // 怕太吵可以註解掉
+        } catch(e) { 
+            alert("連線失敗，請檢查網路"); 
+            saveMsg.innerText = "⚠️ 僅本機儲存";
+        }
+    }
+
     let saveTimeout;
     function autoSaveToCloud() {
         const saveMsg = document.getElementById('save-msg');
@@ -228,21 +251,19 @@
             if (res.ok) {
                 const data = await res.json();
 
-                // ★★★ 核心修改：如果是管理員，直接跳轉到後台，不讓他玩遊戲 ★★★
+                // ★★★ 如果是管理員，直接跳轉到後台 ★★★
                 if (data.role === 'admin') {
-                    // alert("歡迎管理員，即將進入後台..."); // 想提示再打開
                     window.location.href = "admin.html";
-                    return; // 終止後續程式碼，直接離開
+                    return; 
                 }
 
-                // --- 以下是原本的學生邏輯 (保持不變) ---
+                // 一般學生邏輯
                 document.getElementById('auth-overlay').style.display = 'none';
                 document.getElementById('user-info').innerText = `👤 ${data.username} (AI組)`;
                 
                 localStorage.setItem("username", data.username);
                 currentUser = data.username;
 
-                // 如果是一般組誤入，踢去一般組頁面
                 if (data.group === 'Control') {
                     window.location.href = 'profile_control.html';
                     return;
@@ -250,6 +271,7 @@
 
                 const localData = localStorage.getItem(STORAGE_KEY);
                 if (!localData && data.lastXml) {
+                    console.log("☁️ 從雲端下載...");
                     try {
                         const state = JSON.parse(data.lastXml);
                         Blockly.serialization.workspaces.load(state, workspace);
@@ -262,6 +284,7 @@
             }
         } catch(e) { console.error("Init Error", e); }
     }
+
     // --- 6. 登出功能 ---
     function logout() {
         if(confirm("確定要登出嗎？")) {
@@ -358,7 +381,7 @@
       if(!token) { alert("請先登入！"); return; }
       
       saveToLocal();
-      manualSave();
+      manualSave(); // ★★★ 這行現在可以正常運作了 ★★★
 
       const code = Blockly.JavaScript.workspaceToCode(workspace);
       const state = Blockly.serialization.workspaces.save(workspace);
