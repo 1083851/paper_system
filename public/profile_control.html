@@ -12,9 +12,9 @@
   <style>
     body { font-family: 'Segoe UI', sans-serif; margin: 0; height: 100vh; display: flex; background: #f5f5f5; overflow: hidden; }
     
-    /* 遊戲區 (左側) - 調整寬度置中 */
+    /* 遊戲區 (左側) */
     #game-container { 
-        width: 450px; /* 稍微加寬因為沒有聊天室了 */
+        width: 450px; 
         padding: 20px; 
         background: #fff; 
         border-right: 1px solid #ccc; 
@@ -37,7 +37,7 @@
     #status-bar { width: 100%; margin-top: 10px; padding: 8px; background: #f0f0f0; border-radius: 5px; font-size: 12px; text-align: center; color: #555; }
     .save-status { font-size: 11px; color: #888; margin-top: 5px; font-weight: bold; }
 
-    /* ★★★ 按鈕樣式優化 ★★★ */
+    /* 按鈕樣式優化 */
     .btn-row {
         display: flex;
         gap: 10px;
@@ -45,7 +45,7 @@
         margin-top: 10px;
     }
     .btn-action {
-        flex: 1; /* 平均分配寬度 */
+        flex: 1; 
         padding: 10px;
         border: none;
         border-radius: 6px;
@@ -67,7 +67,7 @@
     .btn-save { background: #4285F4; }
     .btn-save:hover { background: #3367d6; }
 
-    /* 登出按鈕：白色背景，灰色邊框 */
+    /* 登出按鈕 */
     .btn-logout { 
         background: #fff; 
         color: #5f6368; 
@@ -168,6 +168,26 @@
         return jsonStr;
     }
 
+    // ★★★ [修復] 補回遺失的 manualSave 函式 ★★★
+    async function manualSave() {
+        if (!token) return;
+        const jsonStr = saveToLocal(); // 先存本地
+        const saveMsg = document.getElementById('save-msg');
+        saveMsg.innerText = "⏳ 上傳中...";
+        try {
+            await fetch(`${API_URL}/api/save-progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ xml: jsonStr })
+            });
+            saveMsg.innerText = "✅ 雙重備份完成";
+            saveMsg.style.color = "green";
+        } catch(e) { 
+            alert("連線失敗，請檢查網路");
+            saveMsg.innerText = "⚠️ 僅本機儲存";
+        }
+    }
+
     let saveTimeout;
     function autoSaveToCloud() {
         const saveMsg = document.getElementById('save-msg');
@@ -210,7 +230,7 @@
     });
 
     // --- 5. 初始化與身分 ---
-   async function initGame() {
+    async function initGame() {
         try {
             const res = await fetch(`${API_URL}/api/user-data`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -219,13 +239,12 @@
             if (res.ok) {
                 const data = await res.json();
 
-                // ★★★ 核心修改：如果是管理員，直接跳轉到後台 ★★★
+                // ★★★ 如果是管理員，直接跳轉到後台 ★★★
                 if (data.role === 'admin') {
                     window.location.href = "admin.html";
                     return; 
                 }
 
-                // --- 以下是原本的學生邏輯 ---
                 document.getElementById('auth-overlay').style.display = 'none';
                 document.getElementById('user-info').innerText = `👤 ${data.username} (一般組)`;
                 
@@ -252,12 +271,13 @@
             }
         } catch(e) { console.error("Init Error", e); }
     }
+
     // --- 6. 登出功能 ---
     function logout() {
         if(confirm("確定要登出嗎？")) {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
-            location.reload(); // 重新整理網頁，會自動跳出登入框
+            location.reload();
         }
     }
 
@@ -289,7 +309,6 @@
         if(token) {
             logsBuffer.push({timestamp:new Date(), category:cat, details:det});
             bufferDisplay.innerText = logsBuffer.length;
-            // 累積到一定量再上傳，或者在執行時上傳
         }
     }
     async function upload() {
@@ -321,7 +340,7 @@
       if(!token) { alert("請先登入！"); return; }
       
       saveToLocal();
-      manualSave();
+      manualSave(); // ★★★ 這裡也需要這個函式 ★★★
 
       const code = Blockly.JavaScript.workspaceToCode(workspace);
       const state = Blockly.serialization.workspaces.save(workspace);
