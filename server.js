@@ -13,7 +13,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MODEL_NAME = "gemini-3-flash-preview"; 
+
+// ★★★ 修正 1：改回穩定的模型名稱，避免 AI 報錯 ★★★
+const MODEL_NAME = "gemini-1.5-flash"; 
 
 if (!process.env.GEMINI_API_KEY) console.error("❌ 找不到 GEMINI_API_KEY");
 
@@ -45,7 +47,7 @@ function authMiddleware(req, res, next) {
   } catch { res.status(403).json({ error: "Token 無效" }); }
 }
 
-// 註冊 (預設都是學生，您可以手動去資料庫把某個帳號 role 改成 'admin')
+// 註冊
 app.post("/register", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -76,15 +78,22 @@ app.post("/login", async (req, res) => {
     user.lastActive = new Date();
     await user.save();
 
+    // ★★★ 這裡做個特殊的處理：如果是 lee1030431，強制給 admin 權限 (寫入 Token) ★★★
+    // 這樣就算資料庫欄位沒改到，登入時也會拿到 admin 權限
+    let userRole = user.role;
+    if (user.username === "lee1030431") {
+        userRole = "admin";
+    }
+
     const token = jwt.sign({ 
         id: user._id, 
         username: user.username,
-        role: user.role // 把角色權限放入 Token
+        role: userRole 
     }, process.env.JWT_SECRET, { expiresIn: "24h" });
     
     res.json({ 
         message: "登入成功", token, username: user.username, 
-        group: user.group, lastXml: user.lastXml, role: user.role 
+        group: user.group, lastXml: user.lastXml, role: userRole 
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -94,25 +103,28 @@ app.get("/api/user-data", authMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
         if (!user) return res.status(404).json({ error: "User not found" });
-        res.json({ username: user.username, group: user.group, lastXml: user.lastXml, role: user.role });
+        
+        // ★★★ 強制覆蓋：如果是 lee1030431，回傳時就是 admin ★★★
+        let finalRole = user.role;
+        if (user.username === "lee1030431") finalRole = "admin";
+
+        res.json({ username: user.username, group: user.group, lastXml: user.lastXml, role: finalRole });
     } catch (err) { res.status(500).json({ error: "Error" }); }
 });
 
-// 儲存進度 (同時更新 lastActive)
+// 儲存進度
 app.post("/api/save-progress", authMiddleware, async (req, res) => {
     try {
         const { xml } = req.body;
-        // ★★★ 更新 lastXml 同時更新 lastActive ★★★
         await User.findByIdAndUpdate(req.user.id, { lastXml: xml, lastActive: new Date() });
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: "Save failed" }); }
 });
 
-// Logs (同時更新 lastActive)
+// Logs
 app.post("/api/logs", authMiddleware, async (req, res) => {
   try {
     const { logs, level } = req.body;
-    // 更新使用者活躍時間
     await User.findByIdAndUpdate(req.user.id, { lastActive: new Date() });
 
     const logsWithUser = logs.map(l => ({ ...l, username: req.user.username }));
@@ -131,7 +143,6 @@ app.post("/api/logs", authMiddleware, async (req, res) => {
 app.post("/api/ask-ai", authMiddleware, async (req, res) => {
   try {
     const { userText, history, gameState } = req.body;
-    // 更新活躍時間
     await User.findByIdAndUpdate(req.user.id, { lastActive: new Date() });
 
     let chatHistory = [];
@@ -150,16 +161,16 @@ app.post("/api/ask-ai", authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ★★★ [新增] 管理員 API：獲取所有使用者列表 ★★★
+// ★★★ 管理員 API (獲取列表) ★★★
 app.get("/api/admin/users", authMiddleware, async (req, res) => {
     try {
-        // 簡單的權限檢查 (實務上建議更嚴格)
-        if (req.user.role !== 'admin' && req.user.username !== 'admin') { 
-            // 這裡留一個後門給帳號叫做 'admin' 的人，或者依賴資料庫 role 欄位
-            // return res.status(403).json({ error: "權限不足" });
+        // ★★★ 修正 2：直接把您的帳號加入程式碼白名單，不用管資料庫有沒有改成功 ★★★
+        const allowList = ['admin', 'lee1030431'];
+        
+        if (req.user.role !== 'admin' && !allowList.includes(req.user.username)) { 
+             return res.status(403).json({ error: "權限不足" });
         }
 
-        // 撈取所有使用者，依照註冊時間排序
         const users = await User.find({}, 'username group role lastActive lastXml createdAt').sort({ createdAt: -1 });
         res.json(users);
     } catch (err) {
