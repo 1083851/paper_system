@@ -14,8 +14,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ★★★ 修正 1：改回穩定的模型名稱，避免 AI 報錯 ★★★
-const MODEL_NAME = "gemini-1.5-flash"; 
+// ★★★ 修正 1：改回正確的模型名稱 (解決 AI Error 500 問題) ★★★
+const MODEL_NAME = "gemini-3-flash-preview"; 
+
+// ★★★ 修正 2：建立管理員白名單 (解決無法進入後台問題) ★★★
+// 只要帳號是 lee1030431 或 admin，系統就會強制認定他是管理員
+const ADMIN_WHITELIST = ["lee1030431", "admin"];
 
 if (!process.env.GEMINI_API_KEY) console.error("❌ 找不到 GEMINI_API_KEY");
 
@@ -78,22 +82,21 @@ app.post("/login", async (req, res) => {
     user.lastActive = new Date();
     await user.save();
 
-    // ★★★ 這裡做個特殊的處理：如果是 lee1030431，強制給 admin 權限 (寫入 Token) ★★★
-    // 這樣就算資料庫欄位沒改到，登入時也會拿到 admin 權限
-    let userRole = user.role;
-    if (user.username === "lee1030431") {
-        userRole = "admin";
+    // ★★★ 強制賦予管理員權限：如果是白名單的人，無視資料庫設定，直接給 admin ★★★
+    let finalRole = user.role;
+    if (ADMIN_WHITELIST.includes(user.username)) {
+        finalRole = "admin";
     }
 
     const token = jwt.sign({ 
         id: user._id, 
         username: user.username,
-        role: userRole 
+        role: finalRole 
     }, process.env.JWT_SECRET, { expiresIn: "24h" });
     
     res.json({ 
         message: "登入成功", token, username: user.username, 
-        group: user.group, lastXml: user.lastXml, role: userRole 
+        group: user.group, lastXml: user.lastXml, role: finalRole 
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -104,9 +107,11 @@ app.get("/api/user-data", authMiddleware, async (req, res) => {
         const user = await User.findById(req.user.id);
         if (!user) return res.status(404).json({ error: "User not found" });
         
-        // ★★★ 強制覆蓋：如果是 lee1030431，回傳時就是 admin ★★★
+        // ★★★ 再次確認：如果是白名單，告訴前端他是 admin (這樣才會觸發跳轉) ★★★
         let finalRole = user.role;
-        if (user.username === "lee1030431") finalRole = "admin";
+        if (ADMIN_WHITELIST.includes(user.username)) {
+            finalRole = "admin";
+        }
 
         res.json({ username: user.username, group: user.group, lastXml: user.lastXml, role: finalRole });
     } catch (err) { res.status(500).json({ error: "Error" }); }
@@ -155,19 +160,21 @@ app.post("/api/ask-ai", authMiddleware, async (req, res) => {
     let context = "";
     if (gameState) context = `地圖:${JSON.stringify(gameState.map)}\n玩家:${JSON.stringify(gameState.player)}\n代碼:\n${gameState.currentCode}`;
     
+    // 因為上面改回了 gemini-1.5-flash，這裡就不會再報錯了
     const chat = model.startChat({ history: chatHistory });
     const result = await chat.sendMessage(context + "\n使用者: " + userText);
     res.json({ reply: result.response.text() });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+      console.error("AI Error:", err);
+      res.status(500).json({ error: err.message }); 
+  }
 });
 
-// ★★★ 管理員 API (獲取列表) ★★★
+// 管理員 API (允許白名單存取)
 app.get("/api/admin/users", authMiddleware, async (req, res) => {
     try {
-        // ★★★ 修正 2：直接把您的帳號加入程式碼白名單，不用管資料庫有沒有改成功 ★★★
-        const allowList = ['admin', 'lee1030431'];
-        
-        if (req.user.role !== 'admin' && !allowList.includes(req.user.username)) { 
+        // ★★★ 權限檢查：只要是白名單，就放行 ★★★
+        if (req.user.role !== 'admin' && !ADMIN_WHITELIST.includes(req.user.username)) { 
              return res.status(403).json({ error: "權限不足" });
         }
 
