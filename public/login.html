@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>迷宮學園 - 運算思維學習平台</title>
+  <style>
+    body { 
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh; 
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); /* 🚀 加入漸層背景 */
+      margin: 0; 
+    }
+    .auth-box { 
+      background: white; 
+      padding: 40px; 
+      border-radius: 16px; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+      text-align: center; 
+      width: 320px; 
+      border-top: 5px solid #4285F4; /* 🚀 頂部色條 */
+    }
+    h2 { margin-bottom: 5px; color: #333; }
+    p.subtitle { color: #666; font-size: 14px; margin-bottom: 25px; }
+    
+    .input-group { text-align: left; margin-bottom: 15px; }
+    .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; margin-left: 5px; }
+    
+    input { 
+      width: 100%; 
+      padding: 12px; 
+      border: 1px solid #ddd; 
+      border-radius: 8px; 
+      box-sizing: border-box; 
+      transition: 0.3s;
+      outline: none;
+    }
+    input:focus { border-color: #4285F4; box-shadow: 0 0 0 3px rgba(66,133,244,0.1); }
+    
+    button { 
+      width: 100%; 
+      padding: 13px; 
+      margin-top: 10px; 
+      cursor: pointer; 
+      border: none; 
+      border-radius: 8px; 
+      font-weight: bold; 
+      color: white; 
+      font-size: 15px;
+      transition: 0.3s; 
+    }
+    .btn-login { background-color: #4285F4; box-shadow: 0 4px 6px rgba(66,133,244,0.2); }
+    .btn-login:hover { background-color: #357ae8; transform: translateY(-1px); }
+    
+    .btn-register { background-color: transparent; color: #34a853; border: 1px solid #34a853; margin-top: 15px; }
+    .btn-register:hover { background-color: #f6fffa; }
+    
+    #msg { margin-top: 20px; font-size: 14px; min-height: 24px; line-height: 1.5; }
+    .error { color: #d93025; background: #fce8e6; padding: 8px; border-radius: 4px; }
+    .success { color: #188038; background: #e6f4ea; padding: 8px; border-radius: 4px; }
+    /* 🚀 劇情故事彈窗樣式 */
+#story-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: none; /* 預設隱藏 */
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+}
+.story-box {
+  background: white;
+  padding: 30px;
+  border-radius: 24px;
+  width: 400px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes popIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.story-img {
+  width: 200px;
+  height: 200px;
+  margin-bottom: 20px;
+  border-radius: 20px;
+  object-fit: cover;
+}
+.story-title {
+  font-size: 24px;
+  color: #1976D2;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+.story-text {
+  font-size: 18px;
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 25px;
+}
+.btn-go {
+  background: #FF7043;
+  color: white;
+  font-size: 20px;
+  padding: 15px 40px;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(255,112,67,0.4);
+  transition: 0.3s;
+}
+.btn-go:hover {
+  background: #F4511E;
+  transform: scale(1.05);
+}
+  </style>
+</head>
+<body>
+
+  <div class="auth-box">
+    <h2>🚀 迷宮學園</h2>
+    <p class="subtitle">運算思維能力測驗系統</p>
+    
+    <div class="input-group">
+      <label>使用者帳號</label>
+      <input type="text" id="username" placeholder="例如：S001">
+    </div>
+    
+    <div class="input-group">
+      <label>密碼</label>
+      <input type="password" id="password" placeholder="請輸入密碼">
+    </div>
+    
+    <button class="btn-login" onclick="handleAuth('login')">進入系統</button>
+    <button class="btn-register" onclick="handleAuth('register')">註冊新受試者</button>
+    
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const API_URL = window.location.origin;
+
+    async function handleAuth(type) {
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value.trim();
+      const msgDiv = document.getElementById('msg');
+
+      if (!u || !p) {
+        msgDiv.innerHTML = "<div class='error'>請填寫帳號與密碼</div>";
+        return;
+      }
+
+      msgDiv.innerHTML = "<span style='color:#666'>連線中，請稍候...</span>";
+
+      try {
+        const res = await fetch(`${API_URL}/${type}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+// 在原本的 handleAuth 函式內修改 res.ok 的邏輯
+    if (res.ok) {
+        if (type === 'login') {
+            msgDiv.innerHTML = "<div class='success'>驗證成功！</div>";
+            
+            // 儲存資訊
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('group', data.group);
+
+            // 🚀 關鍵：如果是管理員直接進後台，受試者則跳出劇情
+            if (data.role === 'admin') {
+                window.location.href = 'admin.html';
+            } else {
+                // 🚀 顯示劇情彈窗
+                document.getElementById('story-overlay').style.display = 'flex';
+            }
+        } else {
+            msgDiv.innerHTML = `<div class='success'>註冊成功！<br>請點擊「進入系統」登入</div>`;
+        }
+    }
+
+            msgDiv.innerHTML = `<div class='error'>${data.error || '驗證失敗'}</div>`;
+        }
+      } catch (e) {
+        msgDiv.innerHTML = "<div class='error'>無法連線至伺服器</div>";
+      }
+    }
+
+    // 🚀 新增：按下劇情確認後的跳轉函式
+    function enterGame() {
+        const btn = document.querySelector('.btn-go');
+        btn.innerText = "正在回家喵...";
+        btn.style.opacity = "0.7";
+        
+        // 增加一點延遲讓孩子感受貓咪的期待
+        setTimeout(() => {
+            window.location.href = 'profile.html';
+        }, 800);
+    }
+    // 🚀 加入 Enter 鍵登入功能
+    document.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') handleAuth('login');
+    });
+  </script>
+</body>
+<div id="story-overlay">
+  <div class="story-box">
+    <img src="icon/gohome.png" class="story-img" alt="小貓咪">
+    <div class="story-title">喵嗚～夥伴你來了！</div>
+    <div class="story-text">
+      小貓咪迷路了，肚子好餓喔...<br>
+      你可以用<strong>魔法積木</strong><br>
+      帶我回到<strong>溫暖的家</strong>嗎？喵～
+    </div>
+    <button class="btn-go" onclick="enterGame()">好喔！出發喵！</button>
+  </div>
+</div>
+</html>

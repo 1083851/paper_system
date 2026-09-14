@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎊 恭喜完成實驗 🎊</title>
+  <style>
+    :root {
+      --primary-color: #4285F4;
+      --success-color: #34a853;
+      --bg-color: #f0f2f5;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: var(--bg-color);
+      overflow: hidden;
+    }
+
+    /* 慶祝背景動畫 */
+    .bg-animation {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: -1;
+      background: radial-gradient(circle, #ffffff 0%, #e1e8f0 100%);
+    }
+
+    .congrats-card {
+      background: white;
+      padding: 50px 40px;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 600px;
+      width: 90%;
+      transform: translateY(20px);
+      animation: slideUp 0.8s forwards ease-out;
+    }
+
+    @keyframes slideUp {
+      to { transform: translateY(0); opacity: 1; }
+      from { transform: translateY(50px); opacity: 0; }
+    }
+
+    .icon-badge {
+      font-size: 80px;
+      margin-bottom: 20px;
+      display: block;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 2.5em;
+    }
+
+    p {
+      color: #666;
+      line-height: 1.6;
+      font-size: 1.1em;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 30px 0;
+    }
+
+    .stat-box {
+      background: #f8f9fa;
+      padding: 15px 25px;
+      border-radius: 12px;
+      border: 1px solid #eee;
+    }
+
+    .stat-number {
+      display: block;
+      font-size: 1.5em;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+
+    .stat-label {
+      font-size: 0.9em;
+      color: #888;
+    }
+
+    .btn-next {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      font-size: 1.2em;
+      font-weight: bold;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
+    }
+
+    .btn-next:hover {
+      background: #357ae8;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(66, 133, 244, 0.4);
+    }
+
+    .footer-note {
+      margin-top: 30px;
+      font-size: 0.85em;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-animation"></div>
+
+  <div class="congrats-card">
+    <span class="icon-badge">🏆</span>
+    <h1>太棒了！你做到了！</h1>
+    <p>恭喜你成功通過了所有迷宮關卡的挑戰。<br>
+    在這段過程中，你展現了優秀的邏輯思考與解決問題的能力。</p>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <span class="stat-number">5 / 5</span>
+        <span class="stat-label">完成關卡數</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">100%</span>
+        <span class="stat-label">挑戰達成率</span>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      研究主題：生成式動態鷹架遊戲設計對運算思維之影響<br>
+      再次感謝你的參與！
+    </div>
+  </div>
+
+  <script>
+    // 簡單的彩色紙花效果 (Confetti)
+    function createConfetti() {
+      const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a0f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+      for (let i = 0; i < 50; i++) {
+        const div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.width = '10px';
+        div.style.height = '10px';
+        div.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        div.style.left = Math.random() * 100 + 'vw';
+        div.style.top = '-10px';
+        div.style.zIndex = '100';
+        div.style.borderRadius = '50%';
+        div.style.opacity = Math.random();
+        document.body.appendChild(div);
+
+        const animation = div.animate([
+          { transform: `translate3d(0, 0, 0) rotate(0deg)`, opacity: 1 },
+          { transform: `translate3d(${(Math.random() - 0.5) * 200}px, 100vh, 0) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+        ], {
+          duration: Math.random() * 3000 + 2000,
+          easing: 'cubic-bezier(0, .9, .57, 1)'
+        });
+
+        animation.onfinish = () => div.remove();
+      }
+    }
+
+    // 進入頁面時觸發
+    window.onload = () => {
+      createConfetti();
+      // 每三秒噴灑一次
+      setInterval(createConfetti, 3000);
+    };
+  </script>
+</body>
+</html>

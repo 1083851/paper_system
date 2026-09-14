@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>Blockly 迷宮 - 第四關</title>
+  
+  <script src="https://unpkg.com/blockly/blockly_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/blocks_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/javascript_compressed.js"></script>
+  <script src="https://unpkg.com/blockly/msg/zh-hant.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<style>
+body { 
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; 
+      margin: 0; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: row; 
+      background: #f5f5f5; 
+      overflow: hidden; 
+    }
+
+    /* 1. 左側：遊戲畫布區 (拉大至 420px) */
+    #game-container { 
+      width: 420px; 
+      flex-shrink: 0; 
+      padding: 20px; 
+      background: #fff; 
+      border-right: 1px solid #ddd; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      z-index: 10;
+      box-sizing: border-box;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+    }
+
+    canvas { 
+      width: 100%; 
+      max-width: 380px;
+      height: auto;
+      border: 3px solid #444; 
+      background: #e6e6e6; 
+      margin-bottom: 25px; 
+      border-radius: 12px; 
+    }
+
+    /* 2. 中間：Blockly 積木區 (自動填滿剩餘空間) */
+    #blocklyDiv { 
+      flex: 1; 
+      height: 100%; 
+      min-width: 300px; /* 確保基本積木操作空間 */
+    }
+
+    /* 3. 右側：AI 貓夥伴區 (拉大至 380px) */
+    #side-panel { 
+      width: 500px; 
+      flex-shrink: 0;
+      background: #fff; 
+      border-left: 1px solid #ddd; 
+      display: flex; 
+      flex-direction: column; 
+      height: 100vh;
+      overflow: hidden; 
+      box-shadow: -2px 0 5px rgba(0,0,0,0.05);
+    }
+    #scaffold-content { flex: 1; padding: 15px; overflow-y: auto; background: #fff; }
+    .scaffold-section { margin-bottom: 20px; text-align: left; }
+    .scaffold-title { font-weight: bold; color: #333; border-left: 4px solid #4285F4; padding-left: 10px; margin-bottom: 10px; font-size: 15px; }
+    .hint-box { background: #f0f7ff; padding: 12px; border-radius: 8px; font-size: 13px; border: 1px dashed #4285F4; line-height: 1.6; color: #333; }
+    .scaffold-list { padding-left: 18px; margin-top: 8px; font-size: 13px; color: #555; line-height: 1.8; }
+    .scaffold-faq { background: #f9f9f9; padding: 12px; font-size: 12px; border-radius: 6px; border: 1px solid #eee; color: #666; }
+    /* 統一全域側邊面板樣式 */
+#scaffold-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+/* 統一頂部標題 */
+.scaffold-header {
+    padding: 15px;
+    border-bottom: 3px solid #E3F2FD;
+    font-weight: bold;
+    color: #1976D2;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+}
+
+/* 內容滾動區間距 */
+#scaffold-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* 統一區段標題 (左側帶有藍條) */
+.scaffold-title {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    color: #1976D2 !important;
+    margin-bottom: 12px !important;
+    display: flex;
+    align-items: center;
+    border-left: 5px solid #42A5F5;
+    padding-left: 10px;
+    margin-top: 10px;
+}
+
+/* 統一核心提示框 (任務與概念) */
+.hint-box {
+    font-size: 16px !important;
+    border-radius: 18px !important;
+    padding: 18px !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    line-height: 1.8;
+    margin-bottom: 20px;
+}
+
+/* 統一三步驟列表 */
+.scaffold-list {
+    list-style: none;
+    padding: 0;
+}
+.scaffold-list li {
+    font-size: 16px;
+    margin-bottom: 12px;
+    background: #E3F2FD; /* 統一使用淡藍色背景 */
+    padding: 12px 15px;
+    border-radius: 12px;
+    color: #1565C0;
+    border: 1px solid #BBDEFB;
+}
+
+/* 統一底部署疑區 (FAQ) */
+.scaffold-faq {
+    border-radius: 15px;
+    padding: 15px;
+    font-size: 15px;
+    line-height: 1.6;
+    border: 1px solid #E1BEE7; /* 統一使用淺紫色邊框 */
+}
+
+/* 按鈕網格佈局 */
+.companion-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px; /* 增加間距，視覺更清爽 */
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+.kid-btn-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 🚀 主按鈕 (幫幫我)：佔滿整列，圖片最大 */
+.btn-companion-main {
+    width: 100%;
+    max-width: 280px; /* 限制最大寬度防止變形 */
+    aspect-ratio: 1 / 1;
+    border: none;
+    border-radius: 40px; /* 圓角矩形感 */
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow: 0 10px 0 #FBC02D; /* 立體底座 */
+    transition: 0.1s;
+}
+
+.btn-companion-main .icon-img-full {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* 讓太陽圖片填滿 */
+}
+
+/* 🚀 次要按鈕 (抱抱與重複)：圓形設計 */
+.btn-companion-sub {
+    width: 130px;
+    height: 130px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.1);
+    transition: 0.1s;
+}
+
+.btn-companion-sub .icon-img-sub {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 按鈕點擊效果 */
+.btn-companion-main:active, .btn-companion-sub:active {
+    transform: translateY(4px);
+    box-shadow: none;
+}
+
+.btn-label {
+    font-size: 18px;
+    font-weight: 900;
+    color: #444;
+}
+
+    #chat-history { flex: 1; padding: 15px; overflow-y: auto; background: #fff; }
+    .message { margin-bottom: 10px; padding: 10px; border-radius: 12px; max-width: 90%; font-size: 14px; word-wrap: break-word; }
+    .ai { background: #e8f0fe; color: #1a73e8; align-self: flex-start; }
+    .user { background: #d1e7dd; color: #0f5132; align-self: flex-end; margin-left: auto; }
+    .chat-input { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px; background: #fff; }
+.btn-kid {
+      border-radius: 18px;
+      transition: all 0.1s;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 5px;
+    }
+    .btn-kid:active { transform: translateY(4px); border-bottom-width: 0px; }
+    .btn-kid.dimmed { opacity: 0.3; pointer-events: none; }
+    .btn-kid.flash { animation: flash-glow 1s infinite alternate; }
+    /* 主麥克風按鈕樣式優化 */
+    #btn-mic {
+      grid-column: span 3;
+      padding: 20px;
+      border-radius: 20px;
+      font-size: 20px !important;
+    }
+
+    /* 狀態欄顯示優化 */
+    #level-selector-container {
+      margin: 15px 0;
+      padding: 10px;
+      background: #f0f7ff;
+      border-radius: 50px;
+    }
+    @keyframes flash-glow {
+            from { box-shadow: 0 0 5px #FFD700; }
+            to { box-shadow: 0 0 20px #FFD700; }
+        }
+
+    /* 登入彈窗 */
+    #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; display: flex; justify-content: center; align-items: center; }
+    .auth-box { background: white; padding: 30px; border-radius: 8px; width: 320px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    .auth-box input { width: 90%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }
+    .auth-box button { width: 100%; padding: 10px; margin-top: 5px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; }
+
+    /* 狀態與按鈕 */
+    #status-bar { width: 100%; margin-top: 10px; padding: 8px; background: #f0f0f0; border-radius: 5px; font-size: 12px; text-align: center; color: #555; }
+    .save-status { font-size: 11px; color: #888; margin-top: 5px; font-weight: bold; }
+    .btn-row { display: flex; gap: 8px; width: 100%; margin-bottom: 8px; }
+    .btn-action { flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; font-size: 13px; display: flex; justify-content: center; align-items: center; }
+    .btn-run { background: #d94d3a; } 
+    .btn-reset { background: #999; } 
+    .btn-save { background: #4285F4; } 
+    .btn-logout { background: #fff; color: #555; border: 1px solid #ccc; }
+
+ /* --- 響應式：平板或窄螢幕時自動調整 --- */
+    @media (max-width: 1200px) {
+      body { flex-direction: column; overflow-y: auto; }
+      #game-container, #side-panel { width: 100%; border: none; }
+      #blocklyDiv { height: 500px; flex: none; }
+      #side-panel { height: auto; border-top: 1px solid #ddd; }
+    }
+
+    /* 調整 AI 按鈕網格，使其更符合圖片的高質感 */
+    #ai-button-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 20px;
+      background: #fdfdfd;
+      border-top: 1px solid #eee;
+    }
+
+    /* 🚀 關鍵修正：關卡點點選單外框樣式 (移出媒體查詢) */
+    .level-dot {
+        width: 24px;
+        height: 24px;
+        background: #eee;
+        color: #999;
+        border-radius: 50%;
+        display: inline-flex; /* 確保圓形外框出現 */
+        justify-content: center;
+        align-items: center;
+        font-size: 11px;
+        cursor: pointer;
+        transition: 0.2s;
+        border: 1px solid #ddd;
+        margin: 0 2px;
+        font-weight: bold;
+        text-decoration: none;
+    }
+    .level-dot.active {
+        background: #bbb; /* 灰色深色圓圈 */
+        color: #fff;
+        border-color: #aaa;
+        cursor: default;
+    }
+    .level-dot.locked {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f9f9f9;
+    }
+    .level-dot:hover:not(.active):not(.locked) {
+        background: #4285F4;
+        color: white;
+        border-color: #4285F4;
+    }
+
+    /* 過關彈窗樣式 (移出媒體查詢) */
+    #win-modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center;
+      backdrop-filter: blur(4px);
+    }
+    .win-box { 
+      background: white; padding: 30px; border-radius: 12px; width: 500px; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: left;
+    }
+</style>
+</head>
+<body>
+
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <h2>🚀 迷宮 (AI組)</h2>
+      <input type="text" id="username_input" placeholder="帳號">
+      <input type="password" id="password_input" placeholder="密碼">
+      <button onclick="auth('login')" style="background:#4285F4">登入</button>
+      <button onclick="auth('register')" style="background:#34a853">註冊</button>
+      <div id="auth-msg" style="margin-top:10px; color:red; font-size:13px;"></div>
+    </div>
+  </div>
+
+  <div id="game-container">
+    <div id="user-info" style="color:#4285F4; margin-bottom:10px; font-size:14px; font-weight:bold;">載入中...</div>
+    <h3 style="margin-top:0;">迷宮挑戰 - 第四關</h3>
+    <canvas id="mazeCanvas" width="320" height="320"></canvas>
+    <div id="level-selector-container" style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px; width: 100%; justify-content: flex-start;">
+        <span style="font-weight: bold; color: #4285F4; font-size: 13px; white-space: nowrap;">Blockly 遊戲：迷宮</span>
+        <div id="level-dots" style="display: flex; gap: 6px;"></div>
+    </div>
+<div class="btn-row">
+  <button onclick="runGame()" class="btn-action btn-run">🏠 回家喵！</button>
+  <button onclick="resetGame()" class="btn-action btn-reset">↺ 重置</button>
+</div>
+
+<button id="ai-static-hint-btn" onclick="openHintModal()" style="display: none; width: 100%; flex: none; box-sizing: border-box; margin-top: 10px; padding: 12px; background: #FFB300; color: #643100; border: 3px solid #FFA000; border-radius: 12px; font-size: 16px; font-weight: bold; box-shadow: 0 4px 0 #FF8F00; cursor: pointer; transition: 0.1s;">
+    💡 提示
+</button>
+
+<div class="btn-row">
+
+    <div id="status-bar" style="display: none;">
+        <div>📦 待傳紀錄: <span id="buffer-count">0</span> 筆</div>
+        <div id="save-msg" class="save-status">讀取中...</div>
+    </div>
+    <div id="scaffolding-status" style="display: none;">
+        <div id="learning-score">0</div>
+        <div id="ai-rating">-</div>
+    </div>
+</div>
+  </div>
+
+  <div id="blocklyDiv"></div>
+
+<div id="side-panel">
+    </div>
+
+<template id="template-control-group">
+    <div id="scaffold-panel">
+        <div class="scaffold-header" style="justify-content: center; background: #FFFBEE; border-bottom: 3px solid #FBC02D;">
+            <span style="font-size: 22px; font-weight: 900; color: #F57C00;">📖 聽故事看地圖：聰明的偵探眼鏡</span>
+        </div>
+        
+        <div id="scaffold-content" style="padding: 15px; background: #FFF;">
+           
+            <div class="scaffold-title" style="font-size: 18px;">🎯  轉彎好多下！讓小貓自己看路</div>
+            <div class="hint-box" style="background: #FFF9C4; border: 3px dashed #FBC02D; display: flex; align-items: center; justify-content: center; gap: 20px; padding: 15px !important;">
+                <img src="icon/cat.png" alt="貓咪" style="width: 60px; height: auto;">
+                
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 100px;">
+                    <span style="font-size: 36px; line-height: 1; margin-bottom: 2px;">❓</span>
+                    <span style="font-size: 18px; font-weight: 900; color: #E65100; white-space: nowrap;">怎麼走喵？</span>
+                </div>
+                
+                <img src="icon/house.png" alt="房子" style="width: 60px; height: auto;">
+            </div>
+            <div class="scaffold-title" style="font-size: 18px;">💡 什麼是偵探眼鏡？</div>
+            <div class="hint-box" style="background: #E0F2FE; border: 2px solid #7DD3FC; padding: 15px !important; text-align: center;">
+                <div style="font-size: 16px; font-weight: 900; color: #0369A1; margin-bottom: 10px;">只要戴上眼鏡，看到轉角就會自動轉彎！</div>
+                
+                <div style="background: #fff; padding: 12px; border-radius: 12px; border: 2px dashed #0284C7; display: inline-flex; flex-direction: column; align-items: center;">
+                    <img src="icon/ophthalmology.png" alt="偵探眼鏡" style="width: 100px; height: auto;">
+                    <div style="font-size: 20px; color: #E91E63; font-weight: bold; margin: -2px 0;">↑ 塞進肚子裡</div>
+                    <img src="icon/turn-left.png" alt="左轉" style="width: 60px; height: auto; border: 2px solid #9C27B0; border-radius: 4px;">
+                </div>
+                
+                <div style="color: #E91E63; font-size: 16px; font-weight: 900; margin-top: 10px;">* 把「轉彎」包在眼鏡裡面，牠才看得到喔！</div>
+            </div>
+            
+            <div class="scaffold-title" style="font-size: 18px;">▶️ 怎麼動手做？</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="background: #E3F2FD; border: 2px solid #90CAF9; border-radius: 15px; padding: 10px; display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px; font-weight: 900; color: #1565C0;">1</span>
+                    <img src="icon/ophthalmology.png" alt="眼鏡" style="width: 45px; height: auto;">
+                    <span style="font-size: 16px; font-weight: 900; color: #1565C0;">先拉出一個藍色偵探眼鏡</span>
+                </div>
+                <div style="background: #FFF3E0; border: 2px solid #FFB74D; border-radius: 15px; padding: 10px; display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px; font-weight: 900; color: #E65100;">2</span>
+                    <img src="icon/turn-left.png" alt="轉彎" style="width: 40px; height: auto;">
+                    <span style="font-size: 16px; font-weight: 900; color: #E65100;">把轉彎積木卡進眼鏡的肚子</span>
+                </div>
+                <div style="background: #E8F5E9; border: 2px solid #A5D6A7; border-radius: 15px; padding: 10px; display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px; font-weight: 900; color: #2E7D32;">3</span>
+                    <span style="font-size: 16px; font-weight: 900; color: #2E7D32;">按下紅色的</span>
+                    <span style="background: #d94d3a; color: white; padding: 4px 8px; border-radius: 8px; font-size: 14px; font-weight: bold; white-space: nowrap;">🏠 回家喵！</span>
+                </div>
+            </div>
+
+            <div class="scaffold-title" style="font-size: 18px;">⚠️ 小貓咪卡住或走錯格子？</div>
+            <div class="scaffold-faq" style="background: #FFEBEE; border: 2px solid #FFCDD2; border-radius: 15px; padding: 10px; display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 28px; font-weight: bold; color: #C62828;">↺</span>
+                <span style="font-size: 15px; font-weight: 900; color: #C62828; line-height: 1.4;">
+                    別慌張喵！按下灰色的<strong>「重置」</strong>按鈕，<br>讓小貓變回原點，重新檢查積木喔！
+                </span>
+            </div>
+
+        </div>
+    </div>
+</template>
+
+<template id="template-ai-group">
+    <div style="padding:10px; border-bottom:1px solid #eee; font-weight:bold; color:#1976D2; background:#fff; text-align:center; font-size: 18px; box-sizing: border-box;">
+        🐱 小貓咪夥伴
+    </div>
+    
+    <div id="chat-history" style="height: 100px; overflow-y: auto; background: #fff; padding: 10px; font-size: 16px; border-bottom: 1px solid #f0f0f0; box-sizing: border-box;">
+        <div class="message ai">喵嗚！我們一起帶小貓回家吧喵～</div>
+    </div>
+
+    <!-- 按鈕網格區域 -->
+    <div id="ai-button-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 12px; background: #f8f9fa; box-sizing: border-box;">
+        
+        <!-- 🎙️ 綠色大按鈕：魔法麥克風 -->
+        <button id="btn-mic" onclick="startVoiceInput()" style="grid-column: span 3; padding: 12px; border: 3px solid #333; border-radius: 18px; background: #4CAF50; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 6px #2E7D32;">
+            <img src="icon/mic1.png" alt="麥克風" style="width: 40%; max-width: 120px; height: auto; margin-bottom: 5px;"/>
+            <span style="color: white; font-size: 20px; font-weight: 900; letter-spacing: 1px;">按住跟我說話喵</span>
+        </button>
+
+        <!-- 💡 黃色按鈕：幫幫我 -->
+        <button onclick="triggerAIAction('help_demo')" style="padding: 10px 5px; border: 3px solid #333; border-radius: 18px; background: #FFD54F; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 6px #F9A825;">
+            <img src="icon/help2.png" alt="幫幫我" style="width: 70%; height: auto; margin-bottom: 5px;"/>
+            <span style="color: #333; font-size: 16px; font-weight: 900;">幫幫我喵</span>
+        </button>
+
+        <!-- ❤️ 粉紅色按鈕：要抱抱 -->
+        <button onclick="triggerAIAction('hug')" style="padding: 10px 5px; border: 3px solid #333; border-radius: 18px; background: #F48FB1; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 6px #D81B60;">
+            <img src="icon/hug1.png" alt="要抱抱" style="width: 70%; height: auto; margin-bottom: 5px;"/>
+            <span style="color: #333; font-size: 16px; font-weight: 900;">要抱抱喵</span>
+        </button>
+
+        <!-- 🔁 藍色按鈕：再說一次 -->
+        <button onclick="replayLastMessage()" style="padding: 10px 5px; border: 3px solid #333; border-radius: 18px; background: #90CAF9; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 6px #1E88E5;">
+            <img src="icon/again1.png" alt="再說一次" style="width: 70%; height: auto; margin-bottom: 5px;"/>
+            <span style="color: #333; font-size: 16px; font-weight: 900;">再聽一次喵</span>
+        </button>
+    </div>
+</template>
+
+<xml id="toolbox" style="display:none">
+    <block type="maze_move"></block>
+    <block type="maze_turn_left"></block>
+    <block type="maze_turn_right"></block>
+    <block type="maze_repeatUntil"></block>
+    <block type="maze_ifPath"></block>
+</xml>
+
+  <script>
+// --- 1. 初始化系統變數 ---
+    const API_URL = "http://localhost:3000";
+    let currentUser = "Guest";
+    const THIS_PAGE_LEVEL = 4; // 🚀 關鍵：確保這裡是 3
+    let currentLevel = THIS_PAGE_LEVEL; 
+    let currentLevelIndex = 3;
+    let isTransitioning = false; 
+    let resetCount = 0; // 🚀 關鍵：必須補上這一行，修復 ReferenceError
+    let currentScore = 0;
+    let lastAiRating = "尚無評語";
+    // --- 🚀 論文評分系統專用變數 ---
+    let studentStatusScore = 5;      // 論文表1：10 分制認知資源
+    let lastActionTime = Date.now();  // 用於計算閒置與思考時間
+    let lastExecutionTime = 0;        // 用於判定「遊戲化行為」
+    let totalErrorCount = 0;
+    let askAiCount = 0;      // 提示次數
+    let runCount = 0;        // 🚀 新增：執行按鈕點擊次數
+    let currentAiMetrics = { functional: 0, efficiency: 0, ct: 0, learning: 0 };        
+    let isInitialLoading = true; // 正在載入舊資料，禁止存檔
+    let isPageRedirecting = false; // 正在跳轉頁面，禁止存檔
+    let stopSignal = false; // 🚀 關鍵：用來中斷正在跑的 async 函式
+    
+
+    
+    /* --- 2. 地圖系統 (還原 U 型路徑) --- */
+    const TILE = 40;
+    const map = [
+      [1, 1, 1, 1, 1, 1, 1, 1],
+      [1, 0, 0, 0, 0, 0, 0, 1],
+      [1, 0, 1, 1, 1, 1, 0, 1],
+      [1, 0, 1, 3, 1, 1, 0, 1], // 3 是終點
+      [1, 0, 0, 0, 1, 1, 0, 1],
+      [1, 1, 1, 1, 1, 1, 0, 1],
+      [1, 2, 0, 0, 0, 0, 0, 1], // 2 是起點
+      [1, 1, 1, 1, 1, 1, 1, 1]
+    ];
+    
+    const startPos = {x: 1, y: 6, dir: 1}; // 起點朝右 (0:上, 1:右, 2:下, 3:左)
+    let player = {...startPos}, isRunning = false;
+
+    // --- 3. Blockly 積木定義 (新增邏輯與迴圈) ---
+Blockly.defineBlocksWithJsonArray([
+  // 1. 向前移動 (forward.png)
+  {
+    "type": "maze_move",
+    "message0": "%1",
+    "args0": [{ "type": "field_image", "src": "icon/forward.png", "width": 50, "height": 50 }],
+    "previousStatement": null, "nextStatement": null, "colour": 195
+  },
+  // 2. 左轉 (turn-left.png)
+  {
+    "type": "maze_turn_left",
+    "message0": "%1",
+    "args0": [{ "type": "field_image", "src": "icon/turn-left.png", "width": 50, "height": 50 }],
+    "previousStatement": null, "nextStatement": null, "colour": 290
+  },
+  // 3. 右轉 (turn-right.png)
+  {
+    "type": "maze_turn_right",
+    "message0": "%1",
+    "args0": [{ "type": "field_image", "src": "icon/turn-right.png", "width": 50, "height": 50 }],
+    "previousStatement": null, "nextStatement": null, "colour": 290
+  },
+  // 4. 重複直到終點 - 魔法箱子 (box.png)
+  {
+    "type": "maze_repeatUntil",
+    "message0": "%1 一直走到家 %2 %3",
+    "args0": [
+      { "type": "field_image", "src": "icon/box.png", "width": 40, "height": 40 },
+      { "type": "input_dummy" },
+      { "type": "input_statement", "name": "DO" }
+    ],
+    "previousStatement": null, "nextStatement": null, "colour": 120
+  },
+  // 5. 如果...就... - 偵探眼鏡 (ophthalmology.png)
+  {
+    "type": "maze_ifPath",
+    "message0": "%1 看到 %2 有路就... %3 %4",
+    "args0": [
+      { "type": "field_image", "src": "icon/ophthalmology.png", "width": 40, "height": 40 },
+      { 
+        "type": "field_dropdown", 
+        "name": "DIR", 
+        "options": [["前面", "FRONT"], ["左邊", "LEFT"], ["右邊", "RIGHT"]] 
+      },
+      { "type": "input_dummy" },
+      { "type": "input_statement", "name": "DO" }
+    ],
+    "previousStatement": null, "nextStatement": null, "colour": 210
+  }
+]);
+
+    // --- 4. 程式碼產生器 ---
+Blockly.JavaScript.forBlock['maze_move'] = () => "await moveForward();\n";
+Blockly.JavaScript.forBlock['maze_turn_left'] = () => "turn('LEFT');\nawait sleep(100);\n";
+Blockly.JavaScript.forBlock['maze_turn_right'] = () => "turn('RIGHT');\nawait sleep(100);\n";
+
+Blockly.JavaScript.forBlock['maze_repeatUntil'] = (block) => {
+  const branch = Blockly.JavaScript.statementToCode(block, 'DO');
+  return `while (!isDone()) {\n${branch}  await sleep(50);\n}\n`;
+};
+
+Blockly.JavaScript.forBlock['maze_ifPath'] = (block) => {
+  const dir = block.getFieldValue('DIR');
+  const branch = Blockly.JavaScript.statementToCode(block, 'DO');
+  return `if (isPath('${dir}')) {\n${branch}}\n`;
+};
+
+    const workspace = Blockly.inject('blocklyDiv', { 
+        toolbox: document.getElementById('toolbox'),
+        trashcan: true 
+    });
+
+    // --- 5. 遊戲核心 API (供 eval 異步執行) ---
+    function isDone() { return map[player.y][player.x] === 3; }
+    function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+    function isPath(dir) {
+      let testDir = player.dir;
+      if (dir === 'LEFT') testDir = (player.dir + 3) % 4;
+      if (dir === 'RIGHT') testDir = (player.dir + 1) % 4;
+      let nx = player.x, ny = player.y;
+      if(testDir === 0) ny--; if(testDir === 1) nx++; if(testDir === 2) ny++; if(testDir === 3) nx--;
+      return map[ny] && map[ny][nx] !== 1;
+    }
+
+    async function moveForward() {
+      if (isPath('FRONT')) {
+        if(player.dir === 0) player.y--; if(player.dir === 1) player.x++; if(player.dir === 2) player.y++; if(player.dir === 3) player.x--;
+        draw();
+        await sleep(250);
+        return true;
+      }
+      return false;
+    }
+
+    function turn(side) {
+      player.dir = (side === 'LEFT') ? (player.dir + 3) % 4 : (player.dir + 1) % 4;
+      draw();
+    }
+
+    // --- 6. 遊戲執行 (改為 Async 以支援重複積木) ---
+let gameInterval = null; 
+let actions = []; // 儲存解析後的動作序列
+function resetGame() {
+    // 1. 發出停止訊號，並清除計時器
+    stopSignal = true; 
+    if (gameInterval) {
+        clearInterval(gameInterval);
+        gameInterval = null;
+    }
+
+    // 2. 轉場防護
+    if (isTransitioning) {
+        isRunning = false;
+        player = { ...startPos };
+        draw();
+        return; 
+    }
+
+    // 3. 紀錄日誌
+    logAction('RESET_GAME', { 
+        lastPlayerPos: { x: player.x, y: player.y },
+        isRunning: isRunning 
+    });
+
+    // 4. 強制還原物理狀態
+    isRunning = false; 
+    player = { ...startPos }; 
+    draw();
+
+    console.log("🛑 執行已強制停止，角色回到起點。");
+
+    // 5. 短暫延遲後恢復旗標，讓下次「執行程式」可以正常運作
+    setTimeout(() => { stopSignal = false; }, 500);
+}
+async function moveForward() {
+    // 🚀 每一步執行前先檢查有沒有人按「重置」
+    if (stopSignal) throw new Error("RESET_STOP"); 
+
+    if (isPath('FRONT')) {
+        if(player.dir === 0) player.y--; 
+        if(player.dir === 1) player.x++; 
+        if(player.dir === 2) player.y++; 
+        if(player.dir === 3) player.x--;
+        draw();
+        await sleep(250);
+        return true;
+    }
+    return false;
+}
+
+// turn 函式如果原本沒寫 await，可以不用改，
+// 但為了保險，建議把跳轉函式也檢查一下
+/**
+ * 🚀 修改 runGame：改為 actions 序列模式
+ */
+async function runGame() {
+    if (isRunning || isTransitioning) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    
+    const code = Blockly.JavaScript.workspaceToCode(workspace);
+    if (!code.trim()) return;
+
+    // 初始化狀態
+    stopSignal = false; // 🚀 確保開始前訊號是關閉的
+    runCount++; 
+    const currentTime = Date.now();
+    const execGap = (currentTime - lastExecutionTime) / 1000; 
+
+    logAction('EXECUTE', { code: code, runCount: runCount, execGap: execGap });
+    await Promise.allSettled([manualSave(), uploadLogs()]);
+
+    player = { ...startPos }; 
+    draw();
+    isRunning = true; 
+
+    try { 
+        const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+        // 這裡維持原本的 API 傳入，保留程式碼中的 await 語法
+        const fn = new AsyncFunction('moveForward', 'turn', 'sleep', 'isDone', 'isPath', code);
+        
+        await fn(moveForward, turn, sleep, isDone, isPath); 
+        
+        // 正常跑完的處理
+        isRunning = false;
+        lastExecutionTime = Date.now(); 
+        if (map[player.y][player.x] !== 3) handleLevel4Failure(execGap);
+        setTimeout(checkWin, 300);
+
+    } catch(e) {
+        // 🚀 關鍵：如果錯誤訊息是我們手動拋出的 RESET_STOP，就不扣分，單純停止
+        if (e.message === "RESET_STOP") {
+            console.log("⏹️ 執行已被手動中斷。");
+        } else {
+            console.error("執行中斷:", e);
+            handleLevel4Failure(execGap);
+            manualSave();
+        }
+        isRunning = false;
+        lastExecutionTime = Date.now(); 
+    }
+}
+// 紀錄打開提示的時間點
+let hintOpenTime = 0;
+
+function openHintModal() {
+    const modal = document.getElementById('hint-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        hintOpenTime = Date.now();
+        
+        // 🚀 紀錄 LSA 行為：開啟靜態圖文提示
+        logAction('OPEN_STATIC_HINT', { 
+            currentLevel: currentLevel 
+        });
+        console.log("💡 幼兒打開了靜態圖文提示");
+    }
+}
+
+function closeHintModal() {
+    const modal = document.getElementById('hint-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        
+        // 計算幼兒看了多久 (秒)
+        const viewDuration = (Date.now() - hintOpenTime) / 1000;
+        
+        // 🚀 紀錄 LSA 行為：關閉圖文提示，並記錄觀看秒數
+        logAction('CLOSE_STATIC_HINT', { 
+            viewDurationSeconds: parseFloat(viewDuration.toFixed(1))
+        });
+        console.log(`💡 幼兒關閉了提示，總共看了 ${viewDuration.toFixed(1)} 秒`);
+    }
+}
+/**
+ * 🚀 第四關專用行為診斷輔助函式 (對齊論文表 1)
+ * @param {number} gap 兩次執行間的時間間隔
+ */
+function handleLevel4Failure(gap) {
+    if (gap < 10) {
+        // 規則 3：遊戲化行為 (-3) -> 快速且盲目的測試
+        studentStatusScore -= 3;
+        console.warn(`🎮 診斷：第四關遊戲化行為，扣 3 分。目前: ${studentStatusScore}`);
+    } else {
+        // 規則 2：建設性試錯 (-1) -> 思考後的邏輯修正
+        studentStatusScore -= 1;
+        console.log(`🔍 診斷：第四關建設性試錯，扣 1 分。目前: ${studentStatusScore}`);
+    }
+    // 確保 10 分制模型邊界
+    studentStatusScore = Math.max(0, Math.min(10, studentStatusScore));
+}
+
+    // --- 7. 保留原本的所有日誌與存檔功能 ---
+    let logsBuffer = []; 
+    // 修改前端 HTML 裡的 logAction 函式
+function logAction(cat, det) { 
+    const token = localStorage.getItem("token");
+    if(token) {
+        const currentTime = Date.now();
+        const timeGap = (currentTime - lastActionTime) / 1000;
+
+        // --- 📊 實作論文表 1 評分邏輯 (第四關深度診斷) ---
+        
+        // 1. 知識建構 (+1)：第四關通常涉及複雜邏輯組合，任何積木變動皆視為知識表徵
+        if (cat.startsWith('BLOCK_')) {
+            studentStatusScore += 1; 
+        } 
+        
+        // 2. 時間互動判定 (第四關為最終挑戰，維持 60 秒閒置門檻)
+        if (!isRunning && cat !== 'EXECUTE') {
+            if (timeGap > 60) {
+                // 規則 5：長時間閒置 (-2) -> 可能是遇到邏輯瓶頸
+                studentStatusScore -= 2;
+                console.log("💤 第四關偵測到閒置: -2");
+            } else if (timeGap > 10) {
+                // 規則 4：有效思考 (+1) -> 複雜關卡中，10~60秒的停頓是珍貴的後設認知
+                studentStatusScore += 1;
+                console.log("🧠 第四關偵測到有效思考: +1");
+            }
+        }
+
+        // ⚠️ 備註：規則 2 (建設性試錯) 與 規則 3 (遊戲化行為) 
+        // 需在 runGame 呼叫 handleFailureScore 觸發扣分，此處會同步抓取
+        
+        // 嚴格限制分數區間 0 ~ 10，符合論文的「10 分制動態模型」
+        studentStatusScore = Math.max(0, Math.min(10, studentStatusScore));
+        lastActionTime = currentTime;
+
+        // --- 🚀 封裝並推送日誌 ---
+        logsBuffer.push({
+            timestamp: new Date().toISOString(), 
+            category: cat, 
+            details: det, 
+            username: currentUser, 
+            atLevel: currentLevel,   // 🚀 確保名稱為 atLevel 以符合後端數據結構
+            currentLevel: currentLevel,
+            statusScore: studentStatusScore // 核心數據：供 LSA (滯後序列分析) 與動態鷹架判定
+        });
+        
+        // 更新 UI 緩衝顯示
+        const display = document.getElementById('buffer-count');
+        if (display) display.innerText = logsBuffer.length;
+
+        // 🚀 即時上傳判定：保留原本功能
+        // 在最終關卡，對話 (CHAT) 與執行 (EXECUTE) 的即時同步極為重要
+        if (
+            cat === 'LEVEL_COMPLETE' || 
+            cat === 'EXECUTE' || 
+            cat.startsWith('CHAT') || 
+            logsBuffer.length >= 10
+        ) {
+            uploadLogs(); 
+        }
+    }
+}
+
+    async function uploadLogs() {
+        const token = localStorage.getItem("token");
+        if (!token || logsBuffer.length === 0) return;
+        const temp = [...logsBuffer]; logsBuffer = []; 
+        document.getElementById('buffer-count').innerText = 0;
+        try {
+            await fetch(`${API_URL}/api/logs`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ logs: temp, level: currentLevel })
+            });
+        } catch(e) { logsBuffer = [...temp, ...logsBuffer]; }
+    }
+
+    setInterval(uploadLogs, 60000);
+
+workspace.addChangeListener(e => { 
+    if (e.type === Blockly.Events.UI) return; // 忽略打開工具箱等 UI 點擊
+    
+    autoSaveToCloud(); // 保留原本自動存檔功能
+
+    // 🚀 新增：詳細行為捕捉
+    const blocks = workspace.getAllBlocks(false);
+    const blockSequence = blocks.map(b => b.type);
+
+    if (e.type === Blockly.Events.BLOCK_CREATE) {
+        logAction('BLOCK_CREATE', { block_type: e.json ? e.json.type : 'unknown', currentSequence: blockSequence });
+    } else if (e.type === Blockly.Events.BLOCK_DELETE) {
+        logAction('BLOCK_DELETE', { currentSequence: blockSequence });
+    } else if (e.type === Blockly.Events.BLOCK_MOVE) {
+        logAction('BLOCK_MOVE', { blockId: e.blockId, currentSequence: blockSequence });
+    } else if (e.type === Blockly.Events.BLOCK_CHANGE) {
+        logAction('BLOCK_PARAM_CHANGE', { blockId: e.blockId, fieldName: e.name, newValue: e.newValue, currentSequence: blockSequence });
+    }
+});
+
+    /**
+ * 強制備份並同步學習表現
+ */
+async function manualSave() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const state = Blockly.serialization.workspaces.save(workspace);
+    const code = Blockly.JavaScript.workspaceToCode(workspace);
+    const blocks = workspace.getAllBlocks(false);
+    const saveMsg = document.getElementById('save-msg');
+
+    // --- 🏆 論文標準化四維度結算邏輯 (對齊 SDARE 框架與第四關目標) ---
+    
+    // 1. 任務達成度 (Functionality - 50%): 評估條件判斷邏輯是否正確處理螺旋路徑 [cite: 158]
+    const isGoalReached = (map[player.y][player.x] === 3);
+    currentAiMetrics.functional = isGoalReached ? 50 : 0;
+
+    // 2. 邏輯精簡度 (Efficiency - 20%): 核心指標！評估是否能將重複模式「抽象化」為條件迴圈 
+    // 第四關最佳積木數（含 if 與迴圈組合）設定為 4 [cite: 158]
+    const optimalCount = 4; 
+    if (isGoalReached) {
+        // 若未使用條件判斷而使用大量堆疊指令，積木數會顯著增加，扣分將反映抽象化能力不足 
+        currentAiMetrics.efficiency = Math.max(0, 20 - (blocks.length - optimalCount) * 2);
+    } else {
+        currentAiMetrics.efficiency = 0;
+    }
+
+    // 3. 策略品質 (Strategy - 15%): 區分「邏輯思考」與「盲目試錯」 
+    // 規則：每多執行一次扣 1 分。若執行間隔 < 10秒(判定為遊戲化行為)，當次額外扣 3 分 。
+    const currentTime = Date.now();
+    const execGap = (typeof lastExecutionTime !== 'undefined') ? (currentTime - lastExecutionTime) / 1000 : 100;
+    let ctPenalty = Math.max(0, runCount - 1) * 1; 
+    if (!isGoalReached && execGap < 10 && runCount > 1) {
+        ctPenalty += 3; // 懲罰性扣分以觸發 AI 介入診斷 
+    }
+    currentAiMetrics.ct = Math.max(0, 15 - ctPenalty);
+
+    // 4. 自我調節能力 (Self-Regulation - 15%): 評估面對複雜邏輯時的元認知表現 
+    // 統一測量指標：重置頻率。前 3 次免費，第 4 次起每次扣 2 分。
+    const resetCount = (typeof totalResetCount !== 'undefined') ? totalResetCount : 0;
+    currentAiMetrics.learning = Math.max(0, 15 - Math.max(0, resetCount - 3) * 2);
+
+    // 更新總分 (100分制)
+    currentScore = currentAiMetrics.functional + currentAiMetrics.efficiency + 
+                   currentAiMetrics.ct + currentAiMetrics.learning;
+
+    // --- 🚀 數據化評語生成 (對齊論文「抽象化」引導語) ---
+    let details = [];
+    details.push(isGoalReached ? "● 任務達成：成功將環境特徵抽象化為邏輯規則！" : "● 任務進度：路口有規律嗎？試著用「如果」積木來判斷喵！");
+
+    if (isGoalReached) {
+        if (blocks.length <= optimalCount) {
+            details.push("● 邏輯優化：判斷邏輯非常精煉，完美展現抽象化能力！");
+        } else {
+            let penalty = 20 - currentAiMetrics.efficiency;
+            details.push(`● 邏輯提醒：目前用了 ${blocks.length} 個積木。思考看看是否有重複的判斷可以合併？(-${Math.round(penalty)})`);
+        }
+    }
+
+    if (runCount <= 1) {
+        details.push("● 執行策略：思慮周全，精準過關！");
+    } else {
+        let penalty = 15 - currentAiMetrics.ct;
+        details.push(`● 執行策略：嘗試了 ${runCount} 次。先拆解螺旋路徑規律再動手吧！(-${Math.round(penalty)})`);
+    }
+
+    if (resetCount <= 3) {
+        details.push("● 認知監控：觀察穩定，展現良好的耐心。");
+    } else {
+        let penalty = 15 - currentAiMetrics.learning;
+        details.push(`● 觀察提醒：重置了 ${resetCount} 次。建議在腦中模擬程式跑法，減少無效嘗試喵！(-${Math.round(penalty)})`);
+    }
+
+    lastAiRating = details.join('、');
+
+    // --- 💾 更新 UI 與雲端同步 ---
+    const scoreEl = document.getElementById('learning-score');
+    if (scoreEl) scoreEl.innerText = Math.round(currentScore);
+    
+    if (saveMsg) {
+        saveMsg.innerText = "⏳ 數據同步中...";
+        saveMsg.style.color = "#4285F4";
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/save-progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ 
+                xml: JSON.stringify(state), 
+                level: 4, 
+                score: currentScore, 
+                statusScore: studentStatusScore, // 傳送 10 分制即時診斷分數 [cite: 169]
+                metrics: currentAiMetrics, 
+                aiRating: lastAiRating 
+            })
+        });
+
+        if (response.ok) {
+            if (saveMsg) {
+                saveMsg.innerText = "✅ 已同步表現數據";
+                saveMsg.style.color = "green";
+            }
+            const resData = await response.json();
+            if (resData.maxLevelReached) {
+                renderLevelDots(currentLevel, resData.maxLevelReached);
+            }
+        }
+    } catch(e) { 
+        console.error("Save Error:", e); 
+        if (saveMsg) saveMsg.innerText = "⚠️ 僅能本地儲存";
+    }
+}
+
+let saveTimeout;
+function autoSaveToCloud() {
+    if (isTransitioning) return; // 🚀 如果正在轉場，物理切斷存檔功能
+
+    const saveMsg = document.getElementById('save-msg');
+    if (saveMsg) {
+        saveMsg.innerText = "備份中..."; 
+        saveMsg.style.color = "#d93025";
+    }
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(manualSave, 1500); 
+}
+
+// --- 語音辨識初始化 ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isAiCoolingDown = false; // 冷卻狀態變數
+
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'zh-TW';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    // 當辨識到聲音後的動作
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        logAction('VOICE_INPUT_FREE', { text: transcript }); // 紀錄內容
+        
+        startAiCooldown(); // 啟動冷躍
+        askAI(transcript).then(() => {
+            const reply = history[history.length - 1]?.parts[0]?.text;
+            if (reply) speak(reply.replace(/喵～/g, "喵"));
+        });
+    };
+
+    recognition.onstart = () => {
+        const micText = document.getElementById('mic-text');
+        if (micText) micText.innerText = "正在聽你說話喵...";
+    };
+
+    recognition.onend = () => {
+        const micText = document.getElementById('mic-text');
+        if (micText) micText.innerText = "按住跟我說話喵";
+    };
+}
+
+// 啟動錄音
+function startVoiceInput() {
+    if (isAiCoolingDown || !recognition) return;
+    try {
+        recognition.start();
+    } catch (e) {
+        console.log("辨識已在執行中");
+    }
+}
+
+// 新增一個變數來紀錄是否正在冷卻中
+function replayLastMessage() {
+    // 從對話紀錄 history 中找出最後一則 AI 的回覆
+    const aiMessages = history.filter(msg => msg.role === 'ai');
+    if (aiMessages.length > 0) {
+        const lastText = aiMessages[aiMessages.length - 1].parts[0].text;
+        
+        // 紀錄行為日誌：使用者點擊了重聽按鈕
+        logAction('CLICK_REPLAY', { content: lastText });
+        
+        // 直接觸發語音，不扣冷卻時間（因為這屬於工作記憶輔助）
+        speak(lastText.replace(/喵～/g, "喵"));
+        
+        // 視覺回饋：讓大喇叭按鈕閃一下
+        console.log("正在為你重播剛才的話喵～");
+    } else {
+        speak("喵？小貓咪還沒說話喔喵～");
+    }
+}
+
+// --- 核心邏輯：AI 行動觸發 (輔助按鈕一 & 二) ---
+async function triggerAIAction(actionType) {
+    if (isAiCoolingDown) return;
+
+    let userText = "";
+    switch(actionType) {
+        case 'help_demo': 
+            userText = "喵嗚～小貓咪，我卡住了，可以給我一點闖關的提示嗎喵？"; 
+            logAction('REQUEST_SCAFFOLD', { level: currentLevel }); // 紀錄為請求鷹架
+            break;
+        case 'hug': 
+            userText = "小貓咪我好累喔，可以給我一個大大的抱抱嗎喵？"; 
+            logAction('REQUEST_EMOTION', { level: currentLevel }); // 紀錄為情感需求
+            break;
+    }
+
+    // 啟動冷卻 (防止連續點擊)
+    startAiCooldown();
+
+    // 呼叫 API
+    await askAI(userText);
+    
+    // 取得回覆並播放
+    const lastReply = history[history.length - 1]?.parts[0]?.text;
+    if (lastReply) {
+        speak(lastReply.replace(/喵～/g, "喵"));
+    }
+}
+
+// 語音辨識結束後的處理 (主按鈕：麥克風)
+recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    logAction('VOICE_INPUT_FREE', { text: transcript }); // 紀錄自由語音內容
+    
+    startAiCooldown(); // 自由語音一樣要冷卻
+    askAI(transcript).then(() => {
+        const reply = history[history.length - 1]?.parts[0]?.text;
+        if (reply) speak(reply.replace(/喵～/g, "喵"));
+    });
+};
+
+// 啟動 15 秒冷卻
+function startAiCooldown() {
+    isAiCoolingDown = true;
+    updateAiButtonState(true);
+    setTimeout(() => {
+        isAiCoolingDown = false;
+        updateAiButtonState(false);
+    }, 15000); 
+}
+
+// 更新按鈕視覺狀態
+function updateAiButtonState(disabled) {
+    const buttons = document.querySelectorAll('#ai-button-grid .btn-kid');
+    buttons.forEach(btn => {
+        if (disabled) {
+            btn.style.opacity = '0.4';
+            btn.style.pointerEvents = 'none'; // 徹底禁止點擊
+        } else {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        }
+    });
+}
+
+// 語音模組
+function speak(text) {
+    const synth = window.speechSynthesis;
+    // 先取消正在說的話
+    synth.cancel();
+    
+    // 過濾掉 Markdown 標籤以利朗讀
+    const cleanText = text.replace(/[*#]/g, '');
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    utter.lang = 'zh-TW';
+    utter.rate = 0.9; // 稍微放慢語速適合幼兒
+    utter.pitch = 1.2; // 提高音調增加可愛感
+    synth.speak(utter);
+}
+    // --- 8. AI 聊天功能 ---
+    let history = []; 
+async function askAI(autoText) {
+    const text = autoText || document.getElementById('userText').value;
+    if (!text) return;
+
+    const chatBox = document.getElementById('chat-history');
+    const token = localStorage.getItem("token");
+    const code = Blockly.JavaScript.workspaceToCode(workspace);
+
+    // 1. 顯示使用者對話
+    if (!autoText) {
+        // 🚀 保留：手動提問時累加提示次數 (10% 扣分邏輯)
+        if (typeof askAiCount !== 'undefined') {
+            askAiCount++; 
+        }
+
+        chatBox.innerHTML += `<div class="message user">${text}</div>`;
+        document.getElementById('userText').value = '';
+        
+        // 🚀 保留：記錄使用者提問日誌
+        logAction('CHAT_USER', { message: text, currentAskAiCount: askAiCount });
+    } else {
+        // 🚀 新增：記錄按鈕觸發的自動提問日誌 (例如：點擊「幫幫我」)
+        logAction('CHAT_USER_AUTO', { message: text, type: 'button_trigger' });
+    }
+
+    try {
+        // 🚀 保留：關鍵修改 2 - 在呼叫 AI 前先同步數據與扣分狀態
+        await manualSave();
+
+        // 2. 呼叫後端 API
+        const res = await fetch(`${API_URL}/api/ask-ai`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                userText: text,
+                history: history,
+                gameState: {
+                    level: 4,             // 建議改為變數 currentLevel 增加通用性
+                    score: studentStatusScore,      
+                    totalScore: currentScore,       
+                    metrics: currentAiMetrics,      
+                    askAiCount: askAiCount,         
+                    runCount: runCount,             
+                    
+                    currentCode: code,
+                    map: map,
+                    recentActions: logsBuffer.slice(-10) 
+                }
+            })
+        });
+
+        const data = await res.json();
+        
+        // 3. 🚀 保留：更新介面上的「AI 導師評價」標籤
+        if (data.rating) {
+            const ratingDisplay = document.getElementById('ai-rating');
+            if (ratingDisplay) {
+                ratingDisplay.innerText = data.rating; 
+                lastAiRating = data.rating; 
+            }
+        }
+
+        // 4. 顯示 AI 貓導師的回覆
+        const reply = data.reply || "喵嗚...我正在整理毛";
+        chatBox.innerHTML += `<div class="message ai">${marked.parse(reply)}</div>`;
+        
+        // 🚀 關鍵新增：記錄 AI 的回覆內容與其診斷標籤到行為日誌 (供 LSA 分析)
+        logAction('CHAT_AI', { 
+            reply: reply, 
+            aiRatingTag: data.rating || "無" 
+        });
+
+        // 更新對話紀錄
+        history.push({ role: 'user', parts: [{ text: text }] });
+        history.push({ role: 'ai', parts: [{ text: reply }] });
+        
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // 🚀 保留：關鍵修改 3 - 再次存檔，持久化 AI 標籤與對話狀態
+        await manualSave();
+
+    } catch (e) {
+        console.error("AI 請求失敗:", e);
+        // 新增：錯誤日誌記錄
+        logAction('AI_ERROR', { error: e.message });
+    }
+}
+
+
+// 🚀 別忘了在 askAI 下方補上這個評分函式，否則會報錯
+function calculateCurrentScore() {
+    let score = 10;
+    const blocks = workspace.getAllBlocks(false);
+    if (blocks.length === 0) return 0;
+
+    // 🚀 關鍵：從日誌緩衝中計算重置次數
+    // 如果重置次數 > 3 次，代表學生遇到瓶頸，分數會降低，觸發 AI 切換至「逐步示範」
+    const resetCount = logsBuffer.filter(l => l.category === 'RESET_GAME').length;
+    score -= (resetCount * 2); 
+    
+    if (blocks.length > 20) score -= 2; // 積木太多扣分
+    return Math.max(0, score);
+}
+
+    // --- 9. 登入、畫圖與過關機制 ---
+    async function auth(type) {
+      const u = document.getElementById('username_input').value;
+      const p = document.getElementById('password_input').value;
+      try {
+        const res = await fetch(`${API_URL}/${type}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            localStorage.setItem('token', data.token); localStorage.setItem('username', u);
+            location.reload(); 
+        } else { document.getElementById('auth-msg').innerText = data.error; }
+      } catch(e) { document.getElementById('auth-msg').innerText = "連線失敗"; }
+    }
+
+    function logout() {
+        if(confirm("確定要登出並回到首頁嗎？")) { 
+            localStorage.removeItem('token'); localStorage.removeItem('username'); 
+            location.href = 'login.html'; 
+        }
+    }
+
+const ctx = document.getElementById('mazeCanvas').getContext('2d');
+
+// 🚀 新增：預載入圖片資源
+const catImg = new Image();
+catImg.src = 'icon/cat.png'; // 請確保你有貓咪的圖片在 images 資料夾中
+const houseImg = new Image();
+houseImg.src = 'icon/house.png'; // 請確保你有房子的圖片在 images 資料夾中
+
+// 🚀 新增：確保圖片載入完成後才繪製 (防止空白畫布)
+let imagesLoaded = 0;
+catImg.onload = houseImg.onload = () => {
+    imagesLoaded++;
+    if (imagesLoaded === 2) {
+        draw(); // 兩張圖片都載入完成後，先執行一次初步繪製
+    }
+};
+
+function draw() {
+  ctx.clearRect(0,0,300,300); // 清空畫布
+
+  // 1. 繪製地圖格子與終點 (房子)
+  for(let y=0; y<map.length; y++) {
+      for(let x=0; x<map[y].length; x++) {
+        
+        if (map[y][x] === 1) {
+            // 牆壁：保留灰色
+            ctx.fillStyle = '#555';
+            ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+            ctx.strokeRect(x*TILE, y*TILE, TILE, TILE);
+        } else if (map[y][x] === 3) {
+            // 🚀 修改：終點格子繪製房子圖片
+            // 如果圖片還沒載入好，先畫金色格子保底
+            if (imagesLoaded === 2) {
+                // 將圖片繪製在格子的中心，稍微縮小一點（例如 40x40）
+                // 圖片起始坐標 (x*TILE + 5, y*TILE + 5)
+                // 圖片寬高 (TILE - 10, TILE - 10)
+                ctx.drawImage(houseImg, x*TILE + 5, y*TILE + 5, TILE - 10, TILE - 10);
+            } else {
+                ctx.fillStyle = 'gold'; // 保底金色
+                ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+                ctx.strokeRect(x*TILE, y*TILE, TILE, TILE);
+            }
+        } else {
+            // 路徑或起點：保留白色
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+            ctx.strokeRect(x*TILE, y*TILE, TILE, TILE);
+        }
+      }
+  }
+
+  // 2. 🚀 修改：繪製貓咪主角
+  if (imagesLoaded === 2) {
+      // 根據玩家方向旋轉圖片
+      ctx.save();
+      ctx.translate(player.x*TILE + TILE/2, player.y*TILE + TILE/2); // 移動到格子中心
+      ctx.rotate((player.dir - 1) * 90 * Math.PI / 180); // dir 1(右)是 0度，dir 0(上)是-90度
+
+      // 繪製貓咪圖片，並讓它置中
+      // 圖片起始坐標 (- (TILE-10)/2, - (TILE-10)/2)
+      // 圖片寬高 (TILE-10, TILE-10)
+      ctx.drawImage(catImg, -(TILE-10)/2, -(TILE-10)/2, TILE - 10, TILE - 10);
+      ctx.restore();
+  } else {
+      // 🚀 修改：圖片未載入時，先保留原本的紅色三角形保底，但將移動中心修改為與貓咪一致
+      ctx.save();
+      ctx.translate(player.x*TILE + TILE/2, player.y*TILE + TILE/2); 
+      ctx.rotate((player.dir-1)*90 * Math.PI/180); 
+      ctx.beginPath();
+      ctx.moveTo(10,0);
+      ctx.lineTo(-10,10);
+      ctx.lineTo(-10,-10);
+      ctx.fillStyle='red'; // 保底紅色
+      ctx.fill();
+      ctx.restore();
+  }
+}
+    
+/* --- 10. 畫布繪製與過關機制 (寫死防護版) --- */
+/**
+ * 10. 過關機制 (第四關整合版)
+ * 任務：結算條件邏輯得分、存入 Level 4 完整積木、發送 LSA 序列終點日誌
+ */
+async function checkWin() {
+    // 1. 到達終點且未在轉場中
+    if (map[player.y][player.x] === 3 && !isTransitioning) {
+        isTransitioning = true; // 🔒 鎖定轉場
+        
+        // 停止所有計時器與自動存檔
+        if (typeof saveTimeout !== 'undefined') clearTimeout(saveTimeout);
+        if (gameInterval) clearInterval(gameInterval);
+
+        // 🚀 關鍵修改 1：執行最後一次「完整成果存檔」
+        // 計算包含「執行間隔扣分」後的最終 currentScore，並生成詳細評語
+        await manualSave(); 
+
+        const code = Blockly.JavaScript.workspaceToCode(workspace);
+        
+        // 顯示過關彈窗 (UI 更新)
+        const winModal = document.getElementById('win-modal');
+        if (winModal) {
+            const codePreview = document.getElementById('js-code-preview');
+            const displayScoreEl = document.getElementById('display-score');
+            const ratingDetailsEl = document.getElementById('rating-details');
+
+            if (codePreview) codePreview.innerText = code;
+            
+            // 🚀 注入美化後的表現數據
+            if (displayScoreEl) {
+                displayScoreEl.innerText = Math.round(currentScore);
+            }
+            if (ratingDetailsEl) {
+                // 將手動存檔生成的報告轉為換行格式
+                ratingDetailsEl.innerHTML = lastAiRating.replace(/、/g, '<br>');
+            }
+
+            winModal.style.display = 'flex';
+        }
+
+        const token = localStorage.getItem("token");
+        try {
+            // 🚀 關鍵修改 2：同步過關數據至 Level 4 的專屬儲存區
+            // 存入「含有 if/else 或重複積木」的狀態，作為條件邏輯掌握度的證據
+            await fetch(`${API_URL}/api/save-progress`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ 
+                    xml: JSON.stringify(Blockly.serialization.workspaces.save(workspace)), 
+                    level: THIS_PAGE_LEVEL,          // 👈 標註為第四關 (4)
+                    score: currentScore,
+                    statusScore: studentStatusScore, // 10分制行為分
+                    metrics: currentAiMetrics,       // 四維度詳細得分
+                    aiRating: lastAiRating
+                }) 
+            });
+            console.log("✅ 第四關通關成果已安全存檔");
+        } catch (e) { 
+            console.error("❌ 第四關同步失敗", e); 
+        }
+
+        // 🚀 關鍵修改 3：紀錄「LEVEL_COMPLETE」日誌
+        // 這是 LSA 分析中區分「練習階段」與「測驗階段」的重要標記
+        logAction('LEVEL_COMPLETE', { 
+            level: THIS_PAGE_LEVEL,
+            finalCode: code,  
+            finalScore: currentScore,
+            statusScore: studentStatusScore,
+            finalRating: lastAiRating,
+            runCount: runCount 
+        });
+
+        // 強制執行最後一次上傳，確保日誌序列不遺失
+        await uploadLogs(); 
+    }
+}
+    /**
+     * 處理關卡完成後的轉場：同步數據 -> 清空積木 -> 跳轉
+     * @param {string} nextUrl 下一關的頁面檔名 (例如: 'profile_level2.html')
+     */
+async function handleLevelTransition(nextUrl) {
+    if (typeof saveTimeout !== 'undefined') clearTimeout(saveTimeout);
+    isTransitioning = true; 
+
+    const token = localStorage.getItem("token");
+    const saveMsg = document.getElementById('save-msg');
+    
+    // 1. 取得當前工作區狀態與代碼
+    const state = Blockly.serialization.workspaces.save(workspace);
+    const code = Blockly.JavaScript.workspaceToCode(workspace);
+
+    if (saveMsg) saveMsg.innerText = "🚀 正在同步最終數據並轉場...";
+
+    // 🚀 關鍵修改：在跳轉前，執行一次全量的「強制存檔」
+    // 確保 xml, score, statusScore, 以及最重要的 chatHistory 全部送往雲端
+    try {
+        await fetch(`${API_URL}/api/save-progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ 
+                xml: JSON.stringify(state), 
+                level: currentLevel,           // 目前關卡 (例如 1)
+                score: currentScore,           // 表現分 (100分制)
+                statusScore: studentStatusScore, // 認知分 (10分制)
+                aiRating: lastAiRating,        // AI 評價標籤
+                metrics: currentAiMetrics,     // 四維度指標
+                chatHistory: history           // 🚀 核心新增：將本關的對話紀錄傳給下一關 AI
+            })
+        });
+        
+        // 同步上傳行為日誌 (LSA 分析用)
+        await uploadLogs();
+        console.log("✅ 關卡數據與對話紀錄已成功同步至雲端");
+        
+    } catch (e) {
+        console.error("❌ 轉場同步失敗:", e);
+        // 即使失敗也嘗試跳轉，避免受試者卡在原地
+    }
+
+    // 2. 物理清空本地工作區 (視覺效果)
+    if (typeof workspace !== 'undefined' && workspace) {
+        workspace.clear(); 
+    }
+
+    // 3. 執行跳轉
+    window.location.href = nextUrl;
+}
+/**
+ * 🚀 處理取消按鈕：隱藏彈窗並解鎖狀態
+ */
+function closeWinModal() {
+    const winModal = document.getElementById('win-modal');
+    if (winModal) {
+        winModal.style.display = 'none';
+        isTransitioning = false; // 🔓 關鍵：解鎖轉場狀態，否則玩家回地圖後無法再次點擊執行
+        console.log("受試者選擇留在目前關卡繼續練習。");
+    }
+}
+
+/**
+ * 🚀 處理確定按鈕：彈出二次確認後才進入下一關
+ */
+function confirmToFinalLevel(nextUrl) {
+    const finalCheck = confirm("確定要進入【最終測驗】嗎？\n進入後將無法返回目前的關卡進行練習喔！");
+    
+    if (finalCheck) {
+        // 使用者點擊確定，執行跳轉
+        handleLevelTransition(nextUrl);
+    }
+    // 若使用者點擊取消，則什麼都不做，保留在過關彈窗畫面
+}
+/**
+ * 動態生成關卡點點 (支援鎖定機制)
+ * @param {number} totalLevels 總關卡數
+ * @param {number} currentActive 目前所在關卡 (例如 2)
+ * @param {number} maxUnlocked 資料庫傳回的最高解鎖關卡
+ */
+function renderLevelDots(currentActive, maxUnlocked) {
+    const dotContainer = document.getElementById('level-dots');
+    if (!dotContainer) return;
+    dotContainer.innerHTML = ''; 
+    
+    // 🚀 關鍵修改：固定循環 4 次，隱藏第 5 關測驗頁面
+    // 根據論文表 4，教學階段僅包含第一至第四關
+    for (let i = 1; i <= 4; i++) {
+        const dot = document.createElement('div');
+        dot.innerText = i;
+        
+        // 判斷狀態：目前關卡、已解鎖、或未解鎖
+        if (i === currentActive) {
+            dot.className = 'level-dot active';
+        } else if (i <= maxUnlocked) {
+            dot.className = 'level-dot'; // 已過關可回頭玩的關卡
+        } else {
+            dot.className = 'level-dot locked'; // 尚未解鎖
+        }
+
+        dot.onclick = () => {
+            if (i === currentActive) return;
+            
+            // 只有目標關卡小於等於最高解鎖關卡時才允許跳轉
+            if (i <= maxUnlocked) {
+                const targetPage = (i === 1) ? 'profile.html' : `profile_level${i}.html`;
+                
+                // 保留原本的自動備份與跳轉功能
+                if (confirm(`跳轉到第 ${i} 關？進度將自動備份喵！`)) {
+                    handleLevelTransition(targetPage);
+                }
+            } else {
+                alert(`喵嗚！請先完成目前的挑戰才能前往第 ${i} 關喔！`);
+                
+                // 保留日誌記錄，用於 LSA 分析受試者的嘗試行為
+                logAction('LEVEL_CLICK_LOCKED', { targetLevel: i }); 
+            }
+        };
+        dotContainer.appendChild(dot);
+    }
+}
+
+window.onload = function() {
+    const token = localStorage.getItem("token");
+    if (token) {
+        // 🚀 關鍵鎖定：避免 Blockly 初始化載入積木時誤發自動存檔
+        isLoadingData = true; 
+
+        // 1. 指定讀取第四關專屬資料 (currentLevel 應為 4)
+        fetch(`${API_URL}/api/user-data?level=${currentLevel}`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        })
+        .then(res => res.json())
+        .then(data => {
+            // 管理者權限判定
+            if (data.role === 'admin') { window.location.href = "admin.html"; return; }
+            
+            document.getElementById('auth-overlay').style.display = 'none';
+
+            // 🚀 關鍵修改 A：不分大小寫處理組別字串，解決判定失效問題
+            const userGroup = data.group ? data.group.toLowerCase() : 'ai';
+            
+            // 🚀 關鍵修改 B：動態更新頂部使用者資訊欄位
+            const groupName = (userGroup === 'control') ? '無AI組' : 'AI組';
+            document.getElementById('user-info').innerText = `👤 ${data.username} (${groupName})`;
+            
+            currentUser = data.username;
+
+            // 2. 還原第四關表現指標 UI
+            if (data.score !== undefined) {
+                currentScore = data.score;
+                const scoreEl = document.getElementById('learning-score');
+                if (scoreEl) scoreEl.innerText = Math.round(currentScore);
+            }
+            if (data.statusScore !== undefined) {
+                studentStatusScore = data.statusScore; // 還原行為分
+            }
+            if (data.aiRating) {
+                lastAiRating = data.aiRating;
+                const ratingEl = document.getElementById('ai-rating');
+                if (ratingEl) ratingEl.innerText = lastAiRating;
+            }
+
+            // 同步地圖與索引
+            if (currentLevel) {
+                currentLevelIndex = currentLevel - 1;
+                if (typeof maps !== 'undefined' && maps[currentLevelIndex]) {
+                    map = maps[currentLevelIndex];
+                }
+            }
+            
+            // 🚀 物理載入與還原 (移除對 "{}" 的排除邏輯)
+            if (data.lastXml && data.lastXml !== "") {
+                try {
+                    const state = JSON.parse(data.lastXml);
+                    workspace.clear(); 
+                    Blockly.serialization.workspaces.load(state, workspace);
+                    console.log("📦 第四關條件邏輯積木已成功復原喵！");
+                } catch(e) { 
+                    console.error("積木格式損毀，執行清空工作區", e); 
+                    workspace.clear();
+                }
+            } else {
+                workspace.clear();
+                console.log("🆕 偵測到新關卡，準備開始第四關挑戰。");
+            }
+
+            draw();
+
+            // 🚀 關鍵修改 C：根據 toLowerCase() 的結果精準載入側邊面板 與 左側提示按鈕
+            const sidePanel = document.getElementById('side-panel');
+            const staticHintBtn = document.getElementById('ai-static-hint-btn'); // 🚀 抓取左側黃色提示按鈕
+
+            if (sidePanel) {
+                if (userGroup === 'control') {
+                    // 📖 載入靜態鷹架
+                    const template = document.getElementById('template-control-group');
+                    if (template) {
+                        sidePanel.innerHTML = template.innerHTML;
+                        console.log("🎮 偵測結果：無AI組 (Control) - 載入靜態引導");
+                    }
+                    // 🚀 隱藏 AI 組專用的圖文提示按鈕
+                    if (staticHintBtn) staticHintBtn.style.display = 'none';
+                    
+                } else {
+                    // 🐱 載入 AI 鷹架
+                    const template = document.getElementById('template-ai-group');
+                    if (template) {
+                        sidePanel.innerHTML = template.innerHTML;
+                        console.log("🎮 偵測結果：實驗組 (AI) - 載入貓導師");
+                    }
+                    // 🚀 顯示圖文提示按鈕，讓 AI 組可以點擊彈出靜態地圖故事
+                    if (staticHintBtn) staticHintBtn.style.display = 'block';
+                }
+            }
+
+            // 4. 更新選單解鎖狀態
+            const unlockedLevel = data.maxLevelReached || 1;
+            renderLevelDots(currentLevel, unlockedLevel);
+
+            // 🚀 關鍵修改 D：延遲解除防護鎖
+            setTimeout(() => { 
+                isLoadingData = false; 
+                console.log("🔓 第四關防護鎖解除，現在開始追蹤受試者行為。");
+            }, 1000);
+        })
+        .catch((err) => { 
+            isLoadingData = false;
+            console.warn("驗證失效或讀取錯誤:", err);
+        });
+    }
+};
+  </script>
+<div id="hint-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div style="background: white; width: 380px; max-height: 90vh; overflow-y: auto; border-radius: 20px; padding: 25px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <button onclick="closeHintModal()" style="position: absolute; top: 15px; right: 15px; background: #f1f3f4; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; cursor: pointer; color: #555; font-size: 16px;">X</button>
+        
+        <h2 style="text-align: center; color: #F57C00; margin-top: 0; border-bottom: 3px solid #FFECB3; padding-bottom: 15px;">📖 聽故事看地圖</h2>
+        
+        <h3 style="color: #1976D2; border-left: 5px solid #1976D2; padding-left: 10px; font-size: 18px;">🎯 轉彎好多下！讓小貓自己看路</h3>
+        <div style="background: #FFF9C4; border: 3px dashed #FBC02D; border-radius: 15px; display: flex; align-items: center; justify-content: center; gap: 20px; padding: 15px;">
+            <img src="icon/cat.png" alt="貓咪" style="width: 60px; height: auto;">
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 100px;">
+                <span style="font-size: 36px; line-height: 1; margin-bottom: 2px;">❓</span>
+                <span style="font-size: 18px; font-weight: 900; color: #E65100; white-space: nowrap;">怎麼走喵？</span>
+            </div>
+            <img src="icon/house.png" alt="房子" style="width: 60px; height: auto;">
+        </div>
+        
+        <h3 style="color: #1976D2; border-left: 5px solid #1976D2; padding-left: 10px; font-size: 18px; margin-top: 20px;">💡 什麼是偵探眼鏡？</h3>
+        <div style="background: #E0F2FE; border: 2px solid #7DD3FC; border-radius: 15px; padding: 15px; text-align: center;">
+            <div style="font-size: 16px; font-weight: 900; color: #0369A1; margin-bottom: 10px;">只要戴上眼鏡，看到轉角就會自動轉彎！</div>
+            
+            <div style="background: #fff; padding: 12px; border-radius: 12px; border: 2px dashed #0284C7; display: inline-flex; flex-direction: column; align-items: center;">
+                <img src="icon/ophthalmology.png" alt="偵探眼鏡" style="width: 100px; height: auto;">
+                <div style="font-size: 20px; color: #E91E63; font-weight: bold; margin: -2px 0;">↑ 塞進肚子裡</div>
+                <img src="icon/turn-left.png" alt="左轉" style="width: 60px; height: auto; border: 2px solid #9C27B0; border-radius: 4px;">
+            </div>
+            
+            <div style="color: #E91E63; font-size: 16px; font-weight: 900; margin-top: 10px;">* 把「轉彎」包在眼鏡裡面，牠才看得到喔！</div>
+        </div>
+        
+        <h3 style="color: #1976D2; border-left: 5px solid #1976D2; padding-left: 10px; font-size: 18px; margin-top: 20px;">▶️ 怎麼動手做？</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="background: #E3F2FD; border: 2px solid #90CAF9; border-radius: 15px; padding: 12px; display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px; font-weight: 900; color: #1565C0;">1</span>
+                <img src="icon/ophthalmology.png" alt="眼鏡" style="width: 45px; height: auto;">
+                <span style="font-size: 16px; font-weight: 900; color: #1565C0;">先拉出一個藍色偵探眼鏡</span>
+            </div>
+            <div style="background: #FFF3E0; border: 2px solid #FFB74D; border-radius: 15px; padding: 12px; display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px; font-weight: 900; color: #E65100;">2</span>
+                <img src="icon/turn-left.png" alt="轉彎" style="width: 40px; height: auto;">
+                <span style="font-size: 16px; font-weight: 900; color: #E65100;">把轉彎積木卡進眼鏡肚子</span>
+            </div>
+            <div style="background: #E8F5E9; border: 2px solid #A5D6A7; border-radius: 15px; padding: 12px; display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px; font-weight: 900; color: #2E7D32;">3</span>
+                <span style="font-size: 16px; font-weight: 900; color: #2E7D32; display: flex; align-items: center;">按下紅色的 <span style="background: #d94d3a; color: white; padding: 4px 8px; border-radius: 8px; font-size: 14px; font-weight: bold; margin-left: 5px;">🏠 回家喵！</span></span>
+            </div>
+        </div>
+
+        <h3 style="color: #C62828; border-left: 5px solid #C62828; padding-left: 10px; font-size: 18px; margin-top: 20px;">⚠️ 小貓咪卡住或走錯格子？</h3>
+        <div style="background: #FFEBEE; border: 2px solid #FFCDD2; border-radius: 15px; padding: 12px; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 32px; font-weight: bold; color: #C62828;">↺</span>
+            <span style="font-size: 15px; font-weight: 900; color: #C62828; line-height: 1.4;">
+                別慌張喵！按下灰色的<strong>「重置」</strong>，<br>讓小貓變回原點，重新檢查積木喔！
+            </span>
+        </div>
+
+    </div>
+</div>
+<div id="win-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+  <div class="win-box" style="background: white; padding: 30px; border-radius: 12px; width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: left;">
+    <h2 style="margin-top: 0; color: #333;">🎉 恭喜過關！</h2>
+    
+    <div id="win-msg" style="margin: 15px 0;">
+        <div style="font-size: 22px; color: #1B5E20; margin-bottom: 12px; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 26px;">🎉</span> 表現積分：<span id="display-score">0</span>
+        </div>
+        <div style="background: #fdf6ec; padding: 15px; border-radius: 8px; border: 1px solid #faecd8; font-size: 14px; line-height: 1.6; color: #666;">
+            <strong style="color: #e6a23c;">🐱 貓導師評分報告：</strong><br>
+            <div id="rating-details" style="margin-top: 5px;">正在計算評分細節...</div>
+        </div>
+    </div>
+    
+    <p style="font-size: 13px; color: #888; margin-bottom: 5px;">你的 JavaScript 程式碼預覽：</p>
+    <div id="js-code-preview" style="background: #f8f9fa; border: 1px solid #ddd; padding: 12px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; margin-bottom: 15px; font-size: 13px; color: #000080; max-height: 120px; overflow-y: auto;"></div>
+    
+    <p style="font-weight: bold; color: #333;">準備好進入下一關挑戰了嗎？</p>
+    
+ <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+    <button onclick="closeWinModal()" 
+            style="padding: 10px 25px; border: 1px solid #dadce0; border-radius: 6px; background: #f1f3f4; color: #3c4043; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s;">
+        取消
+    </button>
+
+    <button onclick="confirmToFinalLevel('profile_level5.html')" 
+            style="padding: 10px 25px; border: none; border-radius: 6px; background: #4285F4; color: white; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s;">
+        確定
+    </button>
+</div>
+  </div>
+</div>
+  
+</div>
+</body>
+</html>
